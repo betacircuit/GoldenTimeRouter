@@ -1,0 +1,10 @@
+.env*
+!.env.example
+.tools
+jaewondata
+docs/data-audit
+test-results
+playwright-report
+*.log
+*.tsbuildinfo
+scripts

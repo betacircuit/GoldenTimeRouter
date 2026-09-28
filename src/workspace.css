@@ -1,0 +1,179 @@
+.workspace-shell { height: 100dvh; min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr); overflow: hidden; background: #eef2f7; }
+.workspace-shell .compact-header { background: #f9fbfc; border-bottom: 1px solid #dce4eb; box-shadow: 0 3px 20px #163b5e08; }
+.workspace-shell .header-inner { width: 100%; max-width: none; min-height: 84px; padding: 10px 24px; gap: 20px; flex-wrap: nowrap; }
+.brand-logo { width: 172px; height: 64px; display: block; mix-blend-mode: multiply; }
+.top-context { display: flex; flex-direction: column; gap: 5px; min-width: 100px; max-width: 235px; }
+.top-context strong { font-size: 16px; font-weight: 800; }
+.top-context>span { font-size: 11px; color: #798a9b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-status { display: flex; flex-wrap: wrap; gap: 5px; max-width: 330px; margin-left: auto; }
+.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 5px; font-size: 10px; line-height: 1.3; color: #718394; background: #edf2f4; }
+.status-pill i { width: 5px; height: 5px; background: #d6a34c; border-radius: 50%; }
+.status-pill i.ok { background: #2b948b; }
+.review-status { color: #92762d; background: #f8f1df; }
+.workspace-shell .header-right { flex: 0 0 auto; margin-left: 0; gap: 7px; }
+.workspace-shell .header-right .button { padding: 0 12px; min-height: 48px; font-size: 11px; }
+.workspace-shell .main-content { max-width: none; width: 100%; min-height: 0; overflow: hidden; padding: 24px; margin: 0; }
+.workspace-shell .patient-page { height: 100%; min-height: 0; position: relative; }
+.workspace-shell .input-layout { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0,1.4fr) minmax(280px,.9fr); gap: 24px; margin: 0; }
+.composer-column { min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) auto; gap: 16px; }
+.workspace-shell .composer-panel { display: flex; flex-direction: column; min-height: 0; padding: 28px; gap: 14px; border: 1px solid #dce5ed; border-radius: 20px; box-shadow: 8px 8px 20px #9bb0c125, -6px -6px 18px #ffffffa6; background: #f8fafc; }
+.composer-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-shrink: 0; }
+.composer-heading h1 { font-size: 25px; letter-spacing: -.8px; line-height: 1.4; margin-top: 5px; }
+.composer-heading .eyebrow { color: #a98738; font-size: 10px; letter-spacing: 2px; }
+.workspace-shell .composer-heading .example-button { margin: 0; min-height: 48px; padding: 8px; font-size: 11px; white-space: nowrap; }
+.composer-help { font-size: 13px; color: #798b9b; }
+.workspace-shell .natural-editor { min-height: 0; flex: 1; display: flex; flex-direction: column; border-color: #dde6ec; background: #edf3f7; }
+.workspace-shell .natural-editor textarea { flex: 1; min-height: 80px; resize: none; color: #24405b; font-size: 19px; line-height: 1.9; background: transparent; }
+.workspace-shell .natural-editor textarea::placeholder { color: #8c9fac; }
+.workspace-shell .editor-caption { flex-shrink: 0; color: #748b9b; padding-top: 16px; }
+.workspace-shell .editor-footer { flex-shrink: 0; flex-wrap: nowrap; padding: 10px 14px; background: #f9fbfc80; border-color: #dce6ed; }
+.workspace-shell .editor-footer>span { font-size: 10px; color: #8e9eaa; }
+.workspace-shell .editor-footer .button { width: auto; min-height: 48px; font-size: 12px; }
+.composer-bottom { display: flex; flex-shrink: 0; justify-content: space-between; gap: 10px; font-size: 10px; color: #8696a5; }
+.input-actions { display: flex; align-items: center; justify-content: space-between; gap: 15px; min-height: 62px; }
+.input-actions-hint { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #7e919b; }
+.workspace-shell .search-hospitals { min-height: 62px; min-width: 240px; justify-content: center; font-size: 17px; border-radius: 14px; background: #067fa9; box-shadow: 4px 5px 13px #337c9855; }
+.workspace-shell .input-aside.location-panel { display: flex; flex-direction: column; min-height: 0; position: static; padding: 22px; gap: 14px; border-radius: 20px; background: #f8fafc; }
+.location-panel-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; }
+.location-panel-heading h2 { font-size: 20px; margin-top: 5px; }
+.location-panel-heading .eyebrow { color: #89a0ad; font-size: 9px; }
+.location-chip { font-size: 10px; color: #9f823f; padding: 7px 9px; background: #f9f1de; border-radius: 6px; }
+.location-chip.ready { color: #3c8776; background: #e6f1ec; }
+.location-map-area { min-height: 150px; flex: 1; position: relative; }
+.location-map-area .map-frame.compact { height: 100%; min-height: 150px; border: 1px solid #d6e2e9; border-radius: 14px; }
+.location-map-area .location-placeholder { height: 100%; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; background: #edf2f6; border-radius: 14px; color: #869eac; }
+.location-placeholder>span { font-size: 11px; }
+.workspace-shell .location-selection { padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; margin: 0; gap: 10px; align-items: flex-start; flex-shrink: 0; }
+.workspace-shell .location-selection>div { min-width: 0; }
+.workspace-shell .location-selection strong { font-size: 13px; }
+.workspace-shell .location-address { font-size: 10px; color: #7e95a3; margin-top: 5px; }
+.workspace-shell .location-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; flex-shrink: 0; }
+.workspace-shell .location-actions .button { font-size: 11px; padding: 9px; }
+.map-tap-controls { position: absolute; z-index: 9; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 5px; }
+.map-tap-controls .icon-button { width: 48px; height: 48px; background: #f8fbfce8; border: 1px solid #dce5ed; box-shadow: 0 2px 8px #193e5820; }
+.address-dialog, .review-dialog { border: 1px solid #dce5ed; border-radius: 20px; padding: 24px; background: #f4f7fa; width: min(750px,calc(100vw - 30px)); max-height: calc(100dvh - 24px); }
+.address-dialog::backdrop, .review-dialog::backdrop { background: #183c5455; backdrop-filter: blur(4px); }
+.address-dialog label { display: block; margin: 18px 0 10px; }
+.workspace-shell .review-dialog { margin: auto; box-shadow: 0 20px 80px #19344450; }
+.review-close { float: right; }
+.review-dialog .fact-group h4 { margin: 8px 0 5px; }
+.review-dialog .fact-card { padding: 10px 14px; }
+.review-dialog .fact-card>strong { font-size: 20px; margin: 5px 0; }
+.review-dialog .fact-evidence { max-height: 36px; overflow: hidden; }
+.review-dialog .help { margin: 10px 0; font-size: 11px; }
+.review-dialog .review-tools { margin-top: 8px; }
+.review-dialog .review-confirm { margin-top: 10px; padding: 10px; min-height: 52px; }
+.review-dialog .review-done { float: right; margin-top: 8px; }
+.tap-pager { display: flex; align-items: center; justify-content: center; gap: 24px; margin-top: 12px; }
+.tap-pager>span { min-width: 45px; text-align: center; font-size: 12px; color: #7f94a3; font-variant-numeric: tabular-nums; }
+.tap-pager .button { min-height: 48px; padding: 10px 16px; font-size: 12px; }
+.processing-overlay { position: fixed; inset: 84px 0 0; z-index: 30; background: #ecf2f8bd; backdrop-filter: blur(7px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.request-progress { width: min(600px,100%); padding: 40px; border-radius: 24px; background: #f9fbfd; box-shadow: 0 20px 80px #34557025; text-align: center; border: 1px solid white; }
+.progress-symbol { display: inline-flex; padding: 17px; background: #e6f1f6; color: #0d85ac; border-radius: 20px; margin-bottom: 22px; }
+.request-progress h2 { font-size: 20px; line-height: 1.7; }
+.elapsed-time { font-size: 12px; color: #7d95a3; margin: 15px 0 28px; }
+.elapsed-time strong { font-size: 34px; color: #1a4862; font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 6px; }
+.request-stages { list-style: none; display: flex; padding: 0; margin: 0; gap: 12px; text-align: left; }
+.request-stages li { flex: 1; min-width: 0; font-size: 11px; color: #9babbb; line-height: 1.6; }
+.request-stages li>span { display: block; margin-bottom: 6px; font-size: 12px; }
+.request-stages li.active { color: #027fb7; font-weight: 700; }
+.request-stages li.done { color: #3c9484; }
+.stage-track { height: 5px; background: #e3eaf1; border-radius: 8px; overflow: hidden; margin-top: 10px; }
+.active .stage-track>span { display: block; width: 40%; height: 100%; border-radius: inherit; background: #0285b5; animation: progress-slide 1.5s ease-in-out infinite; }
+.done .stage-track>span { display: block; width: 100%; height: 100%; background: #4e9d86; }
+@keyframes progress-slide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+.request-progress>p { font-size: 12px; color: #7c91a1; line-height: 1.8; margin: 26px 0 18px; }
+.input-error-toast { position: absolute; z-index: 15; bottom: 82px; left: 10px; right: 10px; margin: 0; box-shadow: 0 6px 18px #40566833; }
+.connection-list { display: grid; grid-template-columns: 105px 1fr; gap: 15px 12px; font-size: 12px; line-height: 1.6; margin: 24px 0; }
+.connection-list dt { color: #7e92a0; }.connection-list dd { margin: 0; }
+.workspace-shell .results-page { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.workspace-shell .result-heading { display: none; }
+.workspace-shell .preferred-hospital { margin: 0; padding: 14px 20px; min-height: 90px; gap: 20px; flex-shrink: 0; }
+.workspace-shell .preferred-label { width: 145px; }
+.workspace-shell .preferred-body h2 { font-size: 18px; }
+.workspace-shell .preferred-body p { font-size: 11px; margin-top: 4px; }
+.workspace-shell .preferred-body small { font-size: 10px; }
+.workspace-shell .preferred-metric { flex-direction: row; align-items: center; gap: 14px; }
+.workspace-shell .preferred-metric>strong { font-size: 28px; white-space: nowrap; }
+.workspace-shell .preferred-metric>span { display: none; }
+.workspace-shell .preferred-metric .button { min-height: 48px; font-size: 11px; }
+.workspace-shell .comparison-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 12px; }
+.workspace-shell .candidate-area { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.workspace-shell .results-toolbar { margin: 0; min-height: 50px; flex-shrink: 0; }
+.workspace-shell .result-count>span { display: none; }
+.workspace-shell .result-count h2 { font-size: 17px; }
+.workspace-shell .view-tabs { display: flex; margin: 6px 0 12px; flex-shrink: 0; }
+.workspace-shell .view-tabs button { min-height: 48px; }
+.workspace-shell .hospital-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; min-height: 0; flex: 1; align-content: start; }
+.workspace-shell .hospital-card { padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto auto auto; column-gap: 10px; row-gap: 6px; min-height: 155px; height: auto; }
+.workspace-shell .card-topline { grid-column: 1 / -1; }
+.workspace-shell .hospital-identity { min-height: 0; grid-column: 1; }
+.workspace-shell .hospital-identity>strong { font-size: 15px; }
+.workspace-shell .hospital-type { font-size: 9px; }
+.workspace-shell .metric-well { grid-column: 2; grid-row: 2 / span 3; display: flex; flex-direction: column; gap: 3px; padding: 5px 10px; min-width: 80px; box-shadow: none; background: #e6eef4; border-radius: 10px; }
+.workspace-shell .hospital-metric { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 7px; }
+.workspace-shell .hospital-metric>strong { font-size: 25px; line-height: 1.2; }
+.workspace-shell .hospital-metric>span { font-size: 8px; min-height: 0; }
+.workspace-shell .hospital-metric.probability { border: 0; padding: 0; flex-direction: column; align-items: center; }
+.workspace-shell .hospital-metric.probability>strong { font-size: 17px; }
+.workspace-shell .hospital-metric>strong.no-value { font-size: 10px; }
+.workspace-shell .card-resource-block { grid-column: 1; }.workspace-shell .resource-status { font-size: 9px; }
+.workspace-shell .freshness { grid-column: 1; font-size: 9px; }
+.workspace-shell .detail-link { display: none; }
+.workspace-shell .results-note { display: none; }
+.workspace-shell .candidate-area>.tap-pager { margin-top: auto; padding-top: 8px; flex-shrink: 0; }
+.workspace-shell .map-results { position: static; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.workspace-shell .map-results>.map-frame { flex: 1; min-height: 160px; height: auto; }
+.workspace-shell .comparison-layout:has(.map-results)>.candidate-area { flex: 0 0 auto; }
+.workspace-shell.stage-3 .main-content { overflow-y: auto; }
+@media (max-width:1199px) {
+  .workspace-shell .header-inner { gap: 12px; padding: 8px 18px; }.brand-logo { width: 142px; height: 54px; }
+  .top-context>span { display: none; }.top-context { min-width: 70px; }.top-status { max-width: 220px; }
+  .workspace-shell .input-layout { grid-template-columns: minmax(0,1.2fr) minmax(275px,1fr); gap: 18px; }
+  .workspace-shell .composer-panel { padding: 20px; }.composer-heading h1 { font-size: 21px; }
+  .composer-heading { flex-wrap: wrap; gap: 4px; }.composer-heading .example-button { margin-left: auto; }
+  .workspace-shell .header-right .button>span { display: none; }
+  .workspace-shell .hospital-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .workspace-shell .preferred-label { width: 110px; }.workspace-shell .preferred-body p { max-width: 300px; }
+}
+@media (max-width:850px) {
+  .workspace-shell .header-inner { gap: 10px; padding: 6px 14px; }.brand-logo { width: 125px; height: 50px; }.top-status { max-width: 200px; }.top-context { display: none; }
+  .workspace-shell .main-content { padding: 16px; }.workspace-shell .input-layout { grid-template-columns: minmax(0,1.1fr) minmax(245px,.9fr); gap: 14px; }
+  .workspace-shell .input-aside.location-panel { padding: 16px; }.workspace-shell .composer-panel { padding: 18px; gap: 12px; }
+  .workspace-shell .natural-editor textarea { font-size: 17px; padding: 16px; }
+  .workspace-shell .editor-footer { flex-wrap: wrap; }.editor-footer .button { margin-left: auto; }
+  .input-actions-hint { font-size: 10px; }.workspace-shell .search-hospitals { min-width: 150px; min-height: 58px; font-size: 15px; }
+  .location-panel-heading { flex-wrap: wrap; }.workspace-shell .location-actions { grid-template-columns: 1fr; gap: 8px; }
+  .workspace-shell .preferred-hospital { padding: 12px 14px; gap: 10px; }.workspace-shell .preferred-label { width: 80px; font-size: 11px; }.workspace-shell .preferred-label small { font-size: 9px; }.workspace-shell .preferred-metric>strong { font-size: 23px; }.workspace-shell .preferred-body h2 { font-size: 16px; }.workspace-shell .preferred-metric .button { width: 48px; font-size: 0; padding: 8px; }.workspace-shell .preferred-metric .button svg { width: 20px; }
+}
+@media (max-width:649px) {
+  .workspace-shell .header-inner { flex-wrap: wrap; gap: 4px 10px; min-height: 96px; padding: 4px 12px; }.brand-logo { width: 108px; height: 42px; }.top-status { order: 3; flex-basis: 100%; max-width: none; margin: 0; }.status-pill { font-size: 9px; padding: 3px 5px; }.workspace-shell .header-right { margin-left: auto; gap: 2px; }.workspace-shell .header-right .button { padding: 7px; }
+  .workspace-shell .main-content { padding: 10px; }.workspace-shell .input-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0,1fr) 155px; gap: 10px; }.workspace-shell .input-aside.location-panel { display: grid; grid-template-columns: 125px minmax(0,1fr); grid-template-rows: auto auto auto; gap: 4px 10px; padding: 10px; }.location-map-area { grid-column: 1; grid-row: 1 / -1; min-height: 0; }.location-map-area .map-frame.compact { min-height: 0; }.location-panel-heading { grid-column: 2; }.location-panel-heading .eyebrow { display: none; }.location-panel-heading h2 { font-size: 13px; margin: 0; }.location-chip { font-size: 8px; padding: 3px; }.workspace-shell .location-selection { grid-column: 2; }.workspace-shell .location-selection>svg { display: none; }.workspace-shell .location-address { font-size: 8px; margin-top: 2px; }.workspace-shell .location-selection strong { font-size: 10px; }.workspace-shell .location-actions { grid-column: 2; grid-template-columns: 1fr 1fr; gap: 4px; }.workspace-shell .location-actions .button { font-size: 9px; padding: 5px; min-height: 48px; }.workspace-shell .location-actions .button svg { display: none; }.location-panel>.inline-alert { position: absolute; bottom: 165px; margin: 0; background: #fff1df; left: 0; right: 0; }
+  .workspace-shell .composer-panel { padding: 12px; gap: 6px; border-radius: 14px; }.composer-heading h1 { font-size: 17px; }.composer-heading .eyebrow { display: none; }.workspace-shell .composer-heading .example-button { font-size: 9px; min-height: 40px; padding: 5px; }.composer-help { font-size: 10px; }.workspace-shell .natural-editor textarea { padding: 8px 12px; font-size: 16px; min-height: 40px; }.workspace-shell .editor-caption { padding: 7px 12px 0; font-size: 10px; }.workspace-shell .editor-footer { padding: 4px 8px; flex-wrap: nowrap; }.workspace-shell .editor-footer>span { display: none; }.workspace-shell .editor-footer .button { min-height: 48px; padding: 5px 10px; font-size: 10px; }.composer-bottom { font-size: 8px; }.composer-column { gap: 8px; }.input-actions { min-height: 48px; }.workspace-shell .search-hospitals { min-height: 48px; min-width: 160px; }.input-actions-hint { font-size: 8px; }.input-actions-hint svg { display: none; }
+  .workspace-shell .hospital-list { grid-template-columns: 1fr; }.workspace-shell .preferred-label { display: none; }.workspace-shell .preferred-body p, .workspace-shell .preferred-body small { display: none; }.workspace-shell .preferred-hospital { min-height: 66px; }.workspace-shell .preferred-metric { gap: 8px; }.workspace-shell .preferred-body h2 { font-size: 15px; }.workspace-shell .preferred-metric>strong { font-size: 19px; }.workspace-shell .hospital-card { min-height: 145px; padding: 10px 12px; }.workspace-shell .hospital-identity>strong { font-size: 14px; }.workspace-shell .result-count h2 { font-size: 13px; }.workspace-shell .sort-label select { font-size: 11px; padding: 8px; }.workspace-shell .results-page { gap: 8px; }.workspace-shell .view-tabs { margin: 4px 0 8px; }.tap-pager { gap: 14px; margin-top: 6px; }.tap-pager .button { font-size: 11px; padding: 8px 12px; }.request-progress { padding: 24px 16px; }.request-progress h2 { font-size: 16px; }.request-stages { gap: 8px; }.request-stages li { font-size: 9px; }.processing-overlay { inset: 96px 0 0; }.review-dialog .fact-grid { grid-template-columns: 1fr 1fr; }.review-dialog .fact-card { padding: 8px; }.review-dialog .fact-label { font-size: 10px; }.review-dialog .fact-status { font-size: 8px; }.review-dialog .fact-card>strong { font-size: 16px; }.review-dialog .fact-source { font-size: 8px; }.review-dialog .review-state { font-size: 9px; }
+}
+@media (prefers-reduced-motion:reduce) { .active .stage-track>span { animation: none; width: 100%; opacity: .5; } }
+
+/* Minimal tablet workspace */
+.workspace-shell .input-layout { align-items: stretch; }
+.location-map-area > .map-frame.compact { position: absolute; inset: 0; height: auto; }
+.map-frame > .kakao-host { position: absolute !important; inset: 0; width: 100%; height: 100%; }
+.workspace-shell .header-right { margin-left: auto; }
+.workspace-shell .editor-footer { justify-content: flex-end; }
+.workspace-shell .preferred-label { width: 105px; }
+.workspace-shell .candidate-area { position: relative; }
+.workspace-shell .results-toolbar { position: absolute; top: 0; right: 0; z-index: 2; }
+.workspace-shell .view-tabs { margin: 0 180px 16px 0; min-height: 50px; }
+.workspace-shell .hospital-list { align-content: stretch; grid-auto-rows: 1fr; }
+.workspace-shell .preferred-body { flex: 1; }
+@media(max-width:649px) { .workspace-shell .header-inner { min-height: 66px; flex-wrap: nowrap; }.processing-overlay { top: 66px; }.workspace-shell .view-tabs { margin-right: 130px; }.workspace-shell .location-actions { grid-row: 3; } }
+.workspace-shell .candidate-area { width: 100%; }
+.workspace-shell .split-results .comparison-layout { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(350px,1fr); gap: 24px; align-items: stretch; }
+.workspace-shell .split-results .candidate-area { width: auto; min-width: 0; }
+.workspace-shell .split-results .hospital-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.workspace-shell .split-results .view-tabs { visibility: hidden; }
+.workspace-shell .split-results .map-results { width: auto; position: relative; top: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.workspace-shell .split-results .map-results > .map-frame { height: auto; flex: 1; min-height: 150px; }
+.workspace-shell .split-results .map-panel-heading { min-height: 48px; margin: 0; }
+.workspace-shell .split-results .map-selection { margin: 0; flex-shrink: 0; }
+.workspace-shell .split-results .route-status { min-height: 20px; }

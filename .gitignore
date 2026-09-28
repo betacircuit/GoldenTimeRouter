@@ -1,0 +1,15 @@
+node_modules/
+public/server-catalog.json
+jaewondata/
+docs/data-audit/
+dist/
+.tools/
+.env
+.env.local
+.env.*
+!.env.example
+.vercel/
+test-results/
+playwright-report/
+*.log
+*.tsbuildinfo
