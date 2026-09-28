@@ -1464,3 +1464,36 @@
     transition: none !important;
   }
 }
+
+@media (min-width: 701px) and (max-height: 760px) {
+  .finder-shell.is-finding .patient-composer {
+    padding: 12px 14px 10px;
+  }
+  .finder-shell.is-finding .patient-composer textarea {
+    height: 62px;
+    min-height: 58px;
+  }
+  .finder-shell.is-finding .patient-composer-footer {
+    margin-top: 6px;
+  }
+  .finder-shell.is-finding .hospital-grid {
+    grid-auto-rows: minmax(128px, calc((100% - 2 * var(--card-gap)) / 3));
+  }
+  .finder-shell.is-finding .finder-card {
+    padding: 9px;
+    gap: 6px;
+  }
+  .finder-shell.is-finding .hospital-select {
+    min-height: 68px;
+    gap: 4px;
+  }
+  .finder-shell.is-finding .hospital-numbers {
+    padding: 7px;
+  }
+  .finder-shell.is-finding .hospital-numbers strong {
+    font-size: 20px;
+  }
+  .finder-shell.is-finding .hospital-phone {
+    min-height: 31px;
+  }
+}

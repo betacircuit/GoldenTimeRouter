@@ -31,6 +31,7 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
   await expect(page.locator(".hospital-grid")).not.toContainText("수용확률");
   for (const viewport of [
     { width: 1920, height: 1080 },
+    { width: 1536, height: 730 },
     { width: 1366, height: 1024 },
     { width: 1024, height: 768 },
     { width: 768, height: 1024 },
@@ -46,6 +47,8 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
     expect(cards[2].y).toBe(cards[0].y);
     expect(cards[3].x).toBe(cards[0].x);
     expect(cards[8].bottom).toBeLessThanOrEqual(viewport.height);
+    const gridBox = (await page.locator(".hospital-grid").boundingBox())!;
+    expect(cards[8].bottom).toBeLessThanOrEqual(gridBox.y + gridBox.height);
     expect(
       await page.evaluate(
         () =>
@@ -275,7 +278,9 @@ test("toolbar expands on demand and exits to a clean first screen", async ({
   await expect(page.getByLabel("환자 관찰 기록")).toHaveValue("");
   await expect(page.locator(".hospital-card")).toHaveCount(0);
   await expect(page.getByRole("banner")).toBeVisible();
-  await expect(page.getByRole("button", { name: "병원 찾기", exact: true })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "병원 찾기", exact: true }),
+  ).toBeEnabled();
   await expect(page.getByRole("timer", { name: "출동 경과 시간" })).toHaveText(
     "출동 경과00:00",
   );
