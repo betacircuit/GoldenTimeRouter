@@ -44,6 +44,7 @@ const catalogSchema = z.object({
     )
     .default([]),
 });
+export type CatalogHospital = z.infer<typeof hospital>;
 const etaSchema = z.object({
   queriedAt: z.string(),
   results: z.array(
@@ -76,7 +77,7 @@ export function distance(a: Point, b: Point) {
     6371008.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h))),
   );
 }
-async function catalog(signal?: AbortSignal) {
+export async function catalog(signal?: AbortSignal) {
   const response = await fetch("/server-catalog.json", {
     signal,
     cache: "no-cache",

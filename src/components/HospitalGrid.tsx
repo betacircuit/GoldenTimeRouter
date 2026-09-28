@@ -8,7 +8,8 @@ import {
   type RecommendationResponse,
 } from "../domain";
 import { primaryApi } from "../services/api";
-import { mockApi } from "../services/mock";
+import { serverCatalogApi } from "../services/serverCatalog";
+import { hospitalCardName } from "../services/hospitalName";
 
 export function HospitalGrid({
   response,
@@ -146,7 +147,12 @@ export function HospitalGrid({
                           : `${(c.distanceMeters / 1000).toFixed(1)} km`}
                       </span>
                     </span>
-                    <strong className="hospital-card-name">{c.name}</strong>
+                    <strong
+                      className={`hospital-card-name ${hospitalCardName(c.name).length > 18 ? "long-name" : ""}`}
+                      title={c.name}
+                    >
+                      {hospitalCardName(c.name)}
+                    </strong>
                     <span className="hospital-numbers">
                       <span
                         aria-label={`예상 이동 시간 ${minutes(c.durationSeconds)}`}
@@ -274,7 +280,7 @@ export function HospitalContact({
     const controller = new AbortController();
     setHospital(null);
     setError("");
-    (demo ? mockApi : primaryApi)
+    (demo ? serverCatalogApi : primaryApi)
       .hospital(candidate.id, controller.signal)
       .then((h) => {
         if (!controller.signal.aborted) setHospital(h);
@@ -323,11 +329,9 @@ export function HospitalContact({
         ) : (
           <div>
             <strong>
-              {demo
-                ? `02-0000-${candidate.id.replace("demo-", "").padStart(4, "0")}`
-                : hospital.emergencyPhone || "등록된 전화번호 없음"}
+              {hospital.emergencyPhone || "등록된 전화번호 없음"}
             </strong>
-            {demo && <small>시연용 가상 번호</small>}
+            {demo && <small>실제 기관 연락처 · 적합성·추천 수치는 시연용</small>}
           </div>
         )}
       </div>

@@ -42,7 +42,7 @@ export default function HospitalDetails({
       <div className="dialog-heading">
         <div>
           <span className="dialog-kicker">
-            {response.isDemo ? "가상 시나리오 · 병원 비교" : "병원 비교"}
+            {response.isDemo ? "실제 병원 · 추천 수치 시연" : "병원 비교"}
           </span>
           <h2 id="hospital-detail-title">{c.name}</h2>
           <p>{c.level}</p>

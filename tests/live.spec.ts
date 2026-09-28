@@ -43,7 +43,7 @@ test("real cards keep unknown values and hour durations readable and open meanin
   await expect(page.locator(".hospital-grid")).toHaveCount(0);
   expect(
     (await page.getByLabel("환자 관찰 기록").boundingBox())!.height,
-  ).toBeGreaterThan(400);
+  ).toBeGreaterThan(320);
   await expect(
     page.getByText("현재 위치 확인됨", { exact: true }),
   ).toBeVisible();
@@ -310,6 +310,6 @@ test("live failure preserves input without inventing candidates; Demo works in l
   await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
   await page.getByRole("button", { name: "데모 병원 찾기" }).click();
   await expect(page.locator(".hospital-card")).toHaveCount(10);
-  await page.getByRole("button", { name: "데모 중앙병원 전화" }).click();
-  await expect(page.getByRole("dialog")).toContainText("시연용 가상 번호");
+  await page.locator(".hospital-card").first().getByRole("button", { name: /전화/ }).click();
+  await expect(page.getByRole("dialog")).toContainText("실제 기관 연락처");
 });

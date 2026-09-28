@@ -22,6 +22,7 @@ import {
 } from "./domain";
 import { primaryApi, isDemo } from "./services/api";
 import { mockApi } from "./services/mock";
+import { catalog } from "./services/serverCatalog";
 import {
   configureDemo,
   demoDraft,
@@ -203,11 +204,17 @@ export default function App() {
       );
       if (controller.signal.aborted) return;
       const next = demo
-        ? configureDemo(result, config, request.origin, request.patient)
+        ? configureDemo(
+            result,
+            config,
+            request.origin,
+            request.patient,
+            (await catalog(controller.signal)).hospitals,
+          )
         : result;
       setRequestPhase("complete");
       // Let the finished bars paint before opening the results.
-      await new Promise((resolve) => window.setTimeout(resolve, 420));
+      await new Promise((resolve) => window.setTimeout(resolve, 800));
       if (controller.signal.aborted) return;
       setResponse(next);
       setNeedsSearch(false);
@@ -469,6 +476,21 @@ export default function App() {
               }
             />
           </form>
+          {!response && !demoMode && origin && (
+            <div className="entry-location-card" role="status">
+              <MapPin size={20} />
+              <div>
+                <strong>{geoBusy ? "위치 갱신 중" : "현재 위치 확인됨"}</strong>
+                <span>{origin.lat.toFixed(5)}, {origin.lng.toFixed(5)}</span>
+                <small>
+                  {origin.accuracyMeters !== undefined
+                    ? `기기 정확도 약 ${Math.round(origin.accuracyMeters).toLocaleString()} m`
+                    : "기기 정확도 미제공"}
+                  {origin.capturedAt ? ` · ${clockTime(origin.capturedAt)} 확인` : ""}
+                </small>
+              </div>
+            </div>
+          )}
           {error && (
             <div className="finder-error" role="alert">
               <Info size={16} />
@@ -532,7 +554,7 @@ export default function App() {
             )}{" "}
             현재 위치
           </button>
-          {!response && origin && !demoMode && !geoError && (
+          {!isEntry && !response && origin && !demoMode && !geoError && (
             <div className="location-status" role="status">
               <strong>
                 {geoBusy
@@ -542,6 +564,8 @@ export default function App() {
                     : "현재 위치 확인됨"}
               </strong>
               <span>
+                {`${origin.lat.toFixed(5)}, ${origin.lng.toFixed(5)}`}
+                {" · "}
                 {origin.accuracyMeters !== undefined
                   ? `정확도 약 ${Math.round(origin.accuracyMeters).toLocaleString()} m`
                   : "정확도 미제공"}

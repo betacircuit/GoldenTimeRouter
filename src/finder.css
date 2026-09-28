@@ -531,7 +531,8 @@
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
-  overflow: hidden;
+  overflow: visible;
+  max-width: 125px;
 }
 .finder-map .map-marker.active {
   outline: 2px solid #fff;
@@ -1351,7 +1352,7 @@
   top: 0;
   transform: translate(-50%, -50%);
   width: max-content;
-  max-width: 140px;
+  max-width: 150px;
 }
 .map-label-leader {
   position: absolute;
@@ -1695,10 +1696,18 @@
 .finder-shell .hospital-card-name {
   width: 100%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  line-height: 1.12;
+  font-size: 11px;
 }
+.finder-shell .hospital-card-name.long-name {
+  font-size: 9px;
+}
+.finder-shell.is-finding .finder-card { gap: 10px; padding: 8px; }
+.finder-shell.is-finding .hospital-select { gap: 3px; }
 .finder-shell .hospital-numbers {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
@@ -1731,7 +1740,7 @@
   letter-spacing: 0;
 }
 .finder-shell.is-preparing .finder-left > form {
-  flex: 1;
+  flex: 0 0 min(68%, 490px);
   min-height: 0;
 }
 .finder-shell.is-preparing .patient-composer {
@@ -1762,6 +1771,25 @@
   display: inline;
   margin-left: 4px;
 }
+.entry-location-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px 19px;
+  border: 1px solid #f9fcff;
+  border-radius: 19px;
+  background: #fff;
+  box-shadow: var(--raised);
+  color: #1c567f;
+}
+.entry-location-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.entry-location-card strong { font-size: 14px; }
+.entry-location-card span { font-size: 14px; font-variant-numeric: tabular-nums; }
+.entry-location-card small { color: #607d96; font-size: 11px; }
 .location-status {
   position: absolute;
   z-index: 10;

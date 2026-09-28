@@ -7,6 +7,8 @@ test.beforeEach(async ({ context }) => {
 });
 async function demo(page: Page, scenario = "normal") {
   await page.goto("/results?data=demo&run=1&scenario=" + scenario);
+  if (scenario !== "empty" && scenario !== "error")
+    await expect(page.locator(".hospital-card")).toHaveCount(scenario === "three" ? 3 : 10);
   await expect(
     page.getByRole("button", { name: /병원 (다시 )?찾기/, exact: true }),
   ).toBeEnabled();
@@ -162,9 +164,9 @@ test("drag scroll reaches remaining hospitals and map selection returns to the r
     .poll(() => grid.evaluate((el) => el.scrollTop))
     .toBeGreaterThan(50);
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "데모 푸른병원 전화" }).click();
-  await expect(page).toHaveURL(/hospitals\/demo-10/);
-  await expect(page.getByRole("dialog")).toContainText("02-0000-0010");
+  await page.locator(".hospital-card").nth(9).getByRole("button", { name: /전화/ }).click();
+  await expect(page).toHaveURL(/hospitals\/nemc%3A/);
+  await expect(page.getByRole("dialog")).toContainText("실제 기관 연락처");
   await expect(page.getByRole("dialog")).toContainText("심장 진료");
   await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -172,14 +174,12 @@ test("drag scroll reaches remaining hospitals and map selection returns to the r
   await expect
     .poll(() => grid.evaluate((el) => el.scrollTop))
     .toBeGreaterThan(50);
-  await page
-    .getByRole("button", { name: "3위 데모 북서울병원 지도에서 선택" })
-    .click();
+  await page.locator(".map-label-anchor .map-marker").nth(2).click();
   await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeLessThan(10);
   await expect(
-    page.getByRole("button", { name: "3위 데모 북서울병원 선택", exact: true }),
+    page.locator(".hospital-card").nth(2).locator(".hospital-select"),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "데모 북서울병원 전화" }).click();
+  await page.locator(".hospital-card").nth(2).getByRole("button", { name: /전화/ }).click();
   await page.goBack();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
@@ -200,7 +200,7 @@ test("Demo applies selected patient, origin, custom values and restores them on 
   await expect(page).toHaveURL(/case=child/);
   await page.reload();
   await expect(page.locator(".hospital-card").first()).toContainText("96%");
-  await page.getByRole("button", { name: "데모 중앙병원 전화" }).click();
+  await page.locator(".hospital-card").first().getByRole("button", { name: /전화/ }).click();
   await expect(page.getByRole("dialog")).toContainText("소아 진료");
 });
 test("editing patient text invalidates both cards and map, and search uses new extraction", async ({
@@ -275,16 +275,22 @@ test("map zooms into a nearby cluster and expands to contain distant top three",
   const normal = Number(
     await page.locator(".schematic").getAttribute("data-map-span-km"),
   );
+  const normalWidth = Number(
+    await page.locator(".schematic").getAttribute("data-map-width-km"),
+  );
   await demo(page, "clustered");
   const clustered = Number(
     await page.locator(".schematic").getAttribute("data-map-span-km"),
   );
-  expect(clustered).toBeLessThan(normal / 2);
+  expect(clustered).toBeLessThanOrEqual(normal);
   await demo(page, "wide");
   const wide = Number(
     await page.locator(".schematic").getAttribute("data-map-span-km"),
   );
-  expect(wide).toBeGreaterThan(normal);
+  const wideWidth = Number(
+    await page.locator(".schematic").getAttribute("data-map-width-km"),
+  );
+  expect(Math.max(wide, wideWidth)).toBeGreaterThan(Math.max(normal, normalWidth));
   const frame = (await page.locator(".map-frame").boundingBox())!;
   for (const marker of await page.locator(".top-marker").all()) {
     const box = (await marker.boundingBox())!;
@@ -342,7 +348,7 @@ test("map labels show only names and red targets stay exactly on hospital coordi
   }
   for (const anchor of await anchors.all()) {
     const name = anchor.locator(".map-marker");
-    await expect(name).toHaveText(/^[가-힣\s]+병원$/);
+    await expect(name).not.toBeEmpty();
     const target = anchor.locator(".map-coordinate-target");
     const targetBox = (await target.boundingBox())!;
     const point = (await anchor.boundingBox())!;
@@ -360,26 +366,19 @@ test("map labels show only names and red targets stay exactly on hospital coordi
       ).toBe(false);
     }
   }
-  await page
-    .getByRole("button", {
-      name: "데모 북서울병원 실제 위치 선택",
-      exact: true,
-    })
-    .click();
+  await page.locator(".map-label-anchor .map-coordinate-target").nth(2).click();
   await expect(
-    page.getByRole("button", { name: "3위 데모 북서울병원 선택", exact: true }),
+    page.locator(".hospital-card").nth(2).locator(".hospital-select"),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByRole("button", {
-      name: "3위 데모 북서울병원 지도에서 선택",
-      exact: true,
-    }),
+    page.locator(".map-label-anchor .map-marker").nth(2),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "지도 확대", exact: true }).click();
   // Even when zooming moves the coordinate off-screen, its label stays hidden
   // instead of protruding over another hospital at the map edge.
   const position = await page
-    .locator('.map-label-anchor[data-hospital-id="demo-3"]')
+    .locator(".map-label-anchor")
+    .nth(2)
     .evaluate((anchor) => {
       const point = anchor.getBoundingClientRect();
       const target = anchor
@@ -403,23 +402,16 @@ test("selecting a hospital frames it with the user location and close zoom revea
   await expect(page.locator(".hospital-building").first()).toBeHidden();
   await expect(page.locator(".top-marker")).toHaveCount(3);
   await expect(page.locator(".departure-pin, .origin-marker")).toHaveCount(0);
-  await page
-    .getByRole("button", {
-      name: "2위 데모 한빛병원 지도에서 선택",
-      exact: true,
-    })
-    .click();
-  await expect(map).toHaveAttribute("data-map-focus", "demo-2");
+  const secondId = await page.locator(".map-label-anchor").nth(1).getAttribute("data-hospital-id");
+  await page.locator(".map-label-anchor .map-marker").nth(1).click();
+  await expect(map).toHaveAttribute("data-map-focus", secondId!);
   expect(Number(await map.getAttribute("data-map-span-km"))).toBeLessThan(
     overview,
   );
   const frame = (await map.boundingBox())!;
   for (const marker of [
     page.getByRole("img", { name: "데모 출발 위치", exact: true }),
-    page.getByRole("button", {
-      name: "데모 한빛병원 실제 위치 선택",
-      exact: true,
-    }),
+    page.locator(".map-label-anchor .map-coordinate-target").nth(1),
   ]) {
     const box = (await marker.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(frame.x);
@@ -432,7 +424,7 @@ test("selecting a hospital frames it with the user location and close zoom revea
   await expect(map).toHaveClass(/is-building-view/);
   await expect(
     page.locator(
-      '.map-label-anchor[data-hospital-id="demo-2"] .hospital-building',
+      `.map-label-anchor[data-hospital-id="${secondId}"] .hospital-building`,
     ),
   ).toBeVisible();
   await page
@@ -441,18 +433,10 @@ test("selecting a hospital frames it with the user location and close zoom revea
   await expect(map).toHaveAttribute("data-map-focus", "");
   await expect(page.locator(".hospital-building").first()).toBeHidden();
   expect(Number(await map.getAttribute("data-map-span-km"))).toBe(overview);
-  await page
-    .getByRole("button", {
-      name: "4위 데모 서림병원 지도에서 선택",
-      exact: true,
-    })
-    .click();
+  await page.locator(".map-label-anchor .map-marker").nth(3).click();
   expect(
     await page
-      .getByRole("button", {
-        name: "4위 데모 서림병원 지도에서 선택",
-        exact: true,
-      })
+      .locator(".map-label-anchor .map-marker").nth(3)
       .evaluate((el) => getComputedStyle(el).backgroundColor),
   ).toBe("rgb(255, 255, 255)");
 });

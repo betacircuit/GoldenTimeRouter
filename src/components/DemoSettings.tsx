@@ -166,7 +166,7 @@ export default function DemoSettings({
           ))}
         </details>
         <div className="demo-dialog-footer">
-          <span>가상 병원·시연용 수치입니다.</span>
+          <span>실제 병원 위치·연락처 / 추천 지표는 시연용</span>
           <button className="button primary" type="submit">
             데모 병원 찾기 <ArrowRight size={18} />
           </button>

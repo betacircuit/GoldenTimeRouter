@@ -14,6 +14,7 @@ import {
   initialNatural,
   type NaturalDraft,
 } from "../components/NaturalPatient";
+import { distance, type CatalogHospital } from "./serverCatalog";
 
 export const demoCases = [
   {
@@ -182,51 +183,49 @@ export function demoDraft(config: DemoConfig): NaturalDraft {
   };
 }
 
-// Synthetic positions and values for UI demonstrations only.
-const offsets = [
-  [0.041, -0.019],
-  [-0.027, 0.023],
-  [0.065, 0.06],
-  [0.006, -0.064],
-  [0.057, 0.095],
-  [-0.047, 0.07],
-  [-0.07, -0.035],
-  [0.065, -0.067],
-  [-0.019, -0.102],
-  [0.095, 0.015],
-];
+// The demonstration changes model outputs, never hospital identity or location.
 export function configureDemo(
   response: RecommendationResponse,
   config: DemoConfig,
   origin: Origin,
   patient: Patient,
+  hospitals: CatalogHospital[],
 ): RecommendationResponse {
+  const nearest = hospitals
+    .filter((h) => h.latitude !== null && h.longitude !== null)
+    .map((h) => ({
+      hospital: h,
+      meters: distance(origin, { lat: h.latitude!, lng: h.longitude! }),
+    }))
+    .sort((a, b) => a.meters - b.meters);
+  if (nearest.length < response.candidates.length)
+    throw new Error("실제 병원 위치 데이터가 충분하지 않습니다.");
+  const chosen = nearest.slice(0, response.candidates.length);
+  if (config.scenario === "wide" && chosen.length > 1) {
+    const distant = nearest.find((h) => h.meters > 12000);
+    if (distant) chosen[1] = distant;
+  }
   return {
     ...response,
     candidates: response.candidates.map((c, i): Candidate => {
       const metric = config.metrics[i];
-      const [lat, lng] =
-        config.scenario === "wide" && i === 1 ? [0.18, 0.21] : offsets[i];
+      const { hospital, meters } = chosen[i];
       const probability =
         config.scenario === "mixed" && i === 1
           ? null
           : Math.max(0, metric.probability) / 100;
       return {
         ...c,
-        position: {
-          lat: origin.lat + lat * (config.scenario === "clustered" ? 0.22 : 1),
-          lng: origin.lng + lng * (config.scenario === "clustered" ? 0.22 : 1),
-        },
+        id: hospital.hospital_id,
+        name: hospital.hospital_name,
+        level: hospital.emergency_institution_category_name || "응급의료기관",
+        position: { lat: hospital.latitude!, lng: hospital.longitude! },
         durationSeconds:
           config.scenario === "mixed" && i === 2 ? null : metric.minutes * 60,
         distanceMeters:
           config.scenario === "mixed" && i === 2
             ? null
-            : Math.round(
-                Math.hypot(lat * 111, lng * 88) *
-                  1000 *
-                  (config.scenario === "clustered" ? 0.22 : 1),
-              ),
+            : meters,
         distanceKind: "straight",
         probability,
         interval:

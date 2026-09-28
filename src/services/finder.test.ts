@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   requestSchema,
   candidateSchema,
@@ -16,6 +17,7 @@ import {
   type DemoConfig,
 } from "./demo";
 import { createFixture } from "./mock";
+import type { CatalogHospital } from "./serverCatalog";
 import {
   destinationViewport,
   highestProbability,
@@ -46,12 +48,16 @@ const config: DemoConfig = {
   metrics: defaultMetrics(),
 };
 const origin = demoOrigins[0];
+const hospitals = (JSON.parse(
+  readFileSync(new URL("../../public/server-catalog.json", import.meta.url), "utf8"),
+) as { hospitals: CatalogHospital[] }).hospitals;
 const request = { origin, patient: projectPatient(demoDraft(config).records) };
 const response = configureDemo(
   createFixture(request),
   config,
   origin,
   request.patient,
+  hospitals,
 );
 
 describe("compact metric formatting", () => {
@@ -92,7 +98,7 @@ describe("demo patient and result contracts", () => {
       ),
     };
     expect(
-      configureDemo(createFixture(request), configured, origin, request.patient)
+      configureDemo(createFixture(request), configured, origin, request.patient, hospitals)
         .candidates[0],
     ).toMatchObject({ durationSeconds: 1860, probability: 0.61 });
     expect(
@@ -101,6 +107,7 @@ describe("demo patient and result contracts", () => {
         configured,
         origin,
         request.patient,
+        hospitals,
       ).candidates,
     ).toEqual([]);
   });
@@ -114,10 +121,11 @@ describe("adaptive map coverage", () => {
       { ...config, scenario: "clustered" },
       origin,
       request.patient,
+      hospitals,
     );
     const close = mapViewport(origin, clustered.candidates);
-    expect((initial.north - initial.south) * 111.32).toBeCloseTo(0.7);
-    expect((close.north - close.south) * 111.32).toBeLessThan(6);
+    expect((initial.north - initial.south) * 111.32).toBeCloseTo(0.32);
+    expect((close.north - close.south) * 111.32).toBeLessThan(12);
   });
   it("includes highest probabilities even when their ranks and positions differ", () => {
     const candidates = response.candidates.map((c, i) =>

@@ -39,10 +39,10 @@ export function mapViewport(origin: Origin, candidates: Candidate[]) {
   const top = highestProbability(candidates);
   if (!candidates.length)
     return {
-      south: origin.lat - 0.35 / 111.32,
-      north: origin.lat + 0.35 / 111.32,
-      west: origin.lng - 0.35 / lngKm,
-      east: origin.lng + 0.35 / lngKm,
+      south: origin.lat - 0.16 / 111.32,
+      north: origin.lat + 0.16 / 111.32,
+      west: origin.lng - 0.16 / lngKm,
+      east: origin.lng + 0.16 / lngKm,
     };
   const points = [
     origin,

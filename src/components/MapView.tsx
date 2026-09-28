@@ -174,7 +174,8 @@ export default function MapView({
             (selected ? "active" : "");
           const label = document.createElement("span");
           label.className = "marker-name";
-          label.textContent = candidate.name.replace("데모 ", "");
+          label.textContent = candidate.name;
+          button.title = candidate.name;
           button.append(label);
           button.setAttribute(
             "aria-label",
@@ -376,7 +377,7 @@ export default function MapView({
           </div>
         )}
         {loaded && controls()}
-        {demo && <span className="map-caption">데모 · 가상 병원 위치</span>}
+        {demo && <span className="map-caption">실제 병원 위치 · 추천 수치 시연</span>}
       </div>
     );
 
@@ -441,6 +442,10 @@ export default function MapView({
       data-map-focus={focusedId}
       data-map-span-km={(
         ((viewport.north - viewport.south) * 111.32) /
+        fallbackZoom
+      ).toFixed(2)}
+      data-map-width-km={(
+        ((viewport.east - viewport.west) * 111.32 * Math.cos((origin.lat * Math.PI) / 180)) /
         fallbackZoom
       ).toFixed(2)}
     >
@@ -531,13 +536,13 @@ export default function MapView({
               aria-pressed={c.id === selectedId}
               onClick={() => chooseHospital.current(c)}
             >
-              <span className="marker-name">{c.name.replace("데모 ", "")}</span>
+              <span className="marker-name">{c.name}</span>
             </button>
           </div>
         );
       })}
       {controls(true)}
-      <span className="map-caption">데모 위치 개요 · 실제 지도 아님</span>
+      <span className="map-caption">실제 병원 좌표 개요 · 지도 연결 없음</span>
     </div>
   );
 }
