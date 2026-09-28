@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { recordSchema } from "./patient/extraction";
+import { recordSchema } from "./patient/extraction.js";
 
 export const pointSchema = z.object({
   lat: z.number().min(-90).max(90),
