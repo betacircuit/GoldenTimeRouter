@@ -1,4 +1,4 @@
-// Keep labels legible while leaving a dot and a leader at the true coordinate.
+// Move only the name labels; the red coordinate targets never move.
 export function arrangeMapLabels(frame: HTMLElement) {
   const bounds = frame.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
@@ -21,9 +21,24 @@ export function arrangeMapLabels(frame: HTMLElement) {
       height: r.height,
     };
   });
-  for (const anchor of frame.querySelectorAll<HTMLElement>(
-    ".map-label-anchor",
-  )) {
+  const anchors = Array.from(
+    frame.querySelectorAll<HTMLElement>(".map-label-anchor"),
+  );
+  // Reserve every coordinate so a label cannot cover a hospital's hit target.
+  occupied.push(
+    ...anchors.map((anchor) => {
+      const r = anchor
+        .querySelector<HTMLElement>(".map-coordinate-target")!
+        .getBoundingClientRect();
+      return {
+        x: r.x - bounds.x,
+        y: r.y - bounds.y,
+        width: r.width,
+        height: r.height,
+      };
+    }),
+  );
+  for (const anchor of anchors) {
     const label = anchor.querySelector<HTMLButtonElement>(".map-marker")!;
     const line = anchor.querySelector<HTMLElement>(".map-label-leader")!;
     const point = anchor.getBoundingClientRect();
@@ -33,7 +48,7 @@ export function arrangeMapLabels(frame: HTMLElement) {
       height = label.offsetHeight;
     if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) {
       label.style.left = "0px";
-      label.style.top = "0px";
+      label.style.top = `${-height / 2 - 22}px`;
       line.style.width = "0px";
       continue;
     }
@@ -43,7 +58,7 @@ export function arrangeMapLabels(frame: HTMLElement) {
       width,
       height,
     });
-    let box = boxAt(0, 0);
+    let box = boxAt(0, -height / 2 - 22);
     search: if (occupied.some((other) => overlaps(box, other))) {
       for (let radius = 12; radius <= 252; radius += 12) {
         for (const [dx, dy] of [

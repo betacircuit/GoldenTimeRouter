@@ -37,7 +37,7 @@ export default function MapView({
   selectedRef.current = selectedId;
   const recenter = useRef<(() => void) | null>(null);
   const zoom = useRef<((delta: number) => void) | null>(null);
-  const markers = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const markers = useRef<Map<string, HTMLElement>>(new Map());
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -73,9 +73,12 @@ export default function MapView({
     setFallbackZoom(1);
   }, [origin.lat, origin.lng, candidateKey]);
   useEffect(() => {
-    markers.current.forEach((button, id) => {
-      button.classList.toggle("active", id === selectedId);
-      button.setAttribute("aria-pressed", String(id === selectedId));
+    markers.current.forEach((anchor, id) => {
+      anchor.classList.toggle("active", id === selectedId);
+      anchor.querySelectorAll("button").forEach((button) => {
+        button.classList.toggle("active", id === selectedId);
+        button.setAttribute("aria-pressed", String(id === selectedId));
+      });
     });
   }, [selectedId]);
 
@@ -112,25 +115,11 @@ export default function MapView({
               (topIds.has(candidate.id) ? "top-marker " : "") +
               (selected ? "active" : "")
             : "map-marker departure-pin";
-          const badge = document.createElement("span");
-          badge.className = "marker-number";
-          badge.textContent = candidate ? String(candidate.rank) : "+";
-          button.append(badge);
           if (candidate) {
             const label = document.createElement("span");
             label.className = "marker-name";
             label.textContent = candidate.name.replace("데모 ", "");
             button.append(label);
-            const metric = document.createElement("small");
-            metric.textContent =
-              (candidate.durationSeconds === null
-                ? "—"
-                : Math.ceil(candidate.durationSeconds / 60) + "분") +
-              " · " +
-              (candidate.probability === null
-                ? "—"
-                : Math.round(candidate.probability * 100) + "%");
-            label.append(metric);
             button.setAttribute(
               "aria-label",
               candidate.rank + "위 " + candidate.name + " 지도에서 선택",
@@ -139,21 +128,35 @@ export default function MapView({
             button.addEventListener("click", () =>
               selectRef.current?.(candidate.id),
             );
-            markers.current.set(candidate.id, button);
           } else {
+            const badge = document.createElement("span");
+            badge.className = "marker-number";
+            badge.textContent = "+";
+            button.append(badge);
             button.setAttribute("aria-label", "출발 위치");
           }
           let content: HTMLElement = button;
           if (candidate) {
             const anchor = document.createElement("div");
-            anchor.className = "map-label-anchor";
+            anchor.className = "map-label-anchor" + (selected ? " active" : "");
+            anchor.dataset.hospitalId = candidate.id;
             const leader = document.createElement("span");
             leader.className = "map-label-leader";
             leader.setAttribute("aria-hidden", "true");
-            const point = document.createElement("span");
-            point.className = "map-label-point";
-            point.setAttribute("aria-hidden", "true");
-            anchor.append(leader, point, button);
+            const target = document.createElement("button");
+            target.type = "button";
+            target.className =
+              "map-coordinate-target" + (selected ? " active" : "");
+            target.setAttribute(
+              "aria-label",
+              candidate.name + " 실제 위치 선택",
+            );
+            target.setAttribute("aria-pressed", String(selected));
+            target.addEventListener("click", () =>
+              selectRef.current?.(candidate.id),
+            );
+            anchor.append(leader, target, button);
+            markers.current.set(candidate.id, anchor);
             content = anchor;
           }
           const overlay = new maps.CustomOverlay({
@@ -357,11 +360,23 @@ export default function MapView({
         return (
           <div
             key={c.id}
-            className="map-label-anchor schematic-anchor"
+            className={
+              "map-label-anchor schematic-anchor" +
+              (c.id === selectedId ? " active" : "")
+            }
+            data-hospital-id={c.id}
             style={{ left: pos.x + "%", top: pos.y + "%" }}
           >
             <span className="map-label-leader" aria-hidden="true" />
-            <span className="map-label-point" aria-hidden="true" />
+            <button
+              type="button"
+              className={
+                "map-coordinate-target" + (c.id === selectedId ? " active" : "")
+              }
+              aria-label={c.name + " 실제 위치 선택"}
+              aria-pressed={c.id === selectedId}
+              onClick={() => onSelect?.(c.id)}
+            />
             <button
               type="button"
               className={
@@ -373,19 +388,7 @@ export default function MapView({
               aria-pressed={c.id === selectedId}
               onClick={() => onSelect?.(c.id)}
             >
-              <span className="marker-number">{c.rank}</span>
-              <span className="marker-name">
-                {c.name.replace("데모 ", "")}
-                <small>
-                  {c.durationSeconds === null
-                    ? "—"
-                    : Math.ceil(c.durationSeconds / 60) + "분"}{" "}
-                  ·{" "}
-                  {c.probability === null
-                    ? "—"
-                    : Math.round(c.probability * 100) + "%"}
-                </small>
-              </span>
+              <span className="marker-name">{c.name.replace("데모 ", "")}</span>
             </button>
           </div>
         );

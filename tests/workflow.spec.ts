@@ -254,6 +254,64 @@ test("map zooms into a nearby cluster and expands to contain distant top three",
     expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height);
   }
 });
+
+test("map labels show only names and red targets stay exactly on hospital coordinates", async ({
+  page,
+}) => {
+  await demo(page, "clustered");
+  await expect(
+    page.locator(".map-label-anchor .marker-number, .map-label-anchor small"),
+  ).toHaveCount(0);
+  const anchors = page.locator(".map-label-anchor");
+  await expect(anchors).toHaveCount(10);
+  for (const anchor of await anchors.all()) {
+    const name = anchor.locator(".map-marker");
+    await expect(name).toHaveText(/^[가-힣\s]+병원$/);
+    const target = anchor.locator(".map-coordinate-target");
+    const targetBox = (await target.boundingBox())!;
+    const point = (await anchor.boundingBox())!;
+    expect(targetBox.x + targetBox.width / 2).toBeCloseTo(point.x, 0);
+    expect(targetBox.y + targetBox.height / 2).toBeCloseTo(point.y, 0);
+    for (const label of await page
+      .locator(".map-label-anchor .map-marker")
+      .all()) {
+      const box = (await label.boundingBox())!;
+      expect(
+        box.x < targetBox.x + targetBox.width &&
+          box.x + box.width > targetBox.x &&
+          box.y < targetBox.y + targetBox.height &&
+          box.y + box.height > targetBox.y,
+      ).toBe(false);
+    }
+  }
+  await page
+    .getByRole("button", {
+      name: "데모 북서울병원 실제 위치 선택",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "3위 데모 북서울병원 선택", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", {
+      name: "3위 데모 북서울병원 지도에서 선택",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "지도 확대", exact: true }).click();
+  const point = (await page
+    .locator('.map-label-anchor[data-hospital-id="demo-3"]')
+    .boundingBox())!;
+  const target = (await page
+    .getByRole("button", {
+      name: "데모 북서울병원 실제 위치 선택",
+      exact: true,
+    })
+    .boundingBox())!;
+  expect(target.x + target.width / 2).toBeCloseTo(point.x, 0);
+  expect(target.y + target.height / 2).toBeCloseTo(point.y, 0);
+});
 test("toolbar expands on demand and exits to a clean first screen", async ({
   page,
 }) => {

@@ -425,12 +425,12 @@
 .finder-map .map-marker {
   min-width: 27px;
   min-height: 28px;
-  padding: 3px;
+  padding: 6px 9px;
   gap: 5px;
-  border: 1px solid #b9cadd;
+  border: 1px solid #ffffff;
   border-radius: 9px;
-  background: #ffffff;
-  color: #36516e;
+  background: #3777d4;
+  color: #ffffff;
   font-size: 10px;
 }
 .finder-map .marker-number {
@@ -442,29 +442,22 @@
 }
 .finder-map .map-marker.top-marker,
 .finder-map .map-marker.active {
-  background: #ffffff;
-  color: #245cd8;
-  border-color: #6d98ee;
+  background: #245ee6;
+  color: #ffffff;
+  border-color: #ffffff;
 }
 .finder-map .map-marker .marker-name {
   display: block;
   font-size: 10px;
   max-width: 105px;
   text-align: left;
-  padding-right: 4px;
+  padding-right: 0;
 }
 .finder-shell .finder-map .map-frame .map-marker.map-marker .marker-name {
   display: block;
   white-space: normal;
   word-break: keep-all;
   overflow: visible;
-}
-.finder-map .marker-name small {
-  display: block;
-  white-space: nowrap;
-  margin-top: 2px;
-  font-size: 8px;
-  opacity: 0.8;
 }
 .finder-map .map-marker.active {
   outline: 2px solid #fff;
@@ -1288,23 +1281,49 @@
 }
 .map-label-leader {
   position: absolute;
-  height: 1px;
+  height: 1.5px;
   left: 0;
   top: 0;
-  background: #6286ac;
+  background: #e54955b3;
   transform-origin: 0 50%;
   pointer-events: none;
 }
-.map-label-point {
+.map-coordinate-target {
   position: absolute;
-  width: 5px;
-  height: 5px;
-  left: -2.5px;
-  top: -2.5px;
-  border-radius: 50%;
-  background: #446f9b;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  left: -14px;
+  top: -14px;
+  z-index: 4;
+  border: 1.5px solid #e34653;
+  border-radius: 7px;
+  background: #fff1f2b8;
   box-shadow: 0 0 0 2px #ffffffbf;
-  pointer-events: none;
+  cursor: pointer;
+}
+.map-coordinate-target::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #e34653;
+}
+.map-coordinate-target.active,
+.map-coordinate-target:hover,
+.map-coordinate-target:focus-visible {
+  background: #ffe0e4;
+  outline: 2px solid #ffffff;
+  box-shadow: 0 0 0 4px #e3465350;
+}
+.map-label-anchor.active {
+  z-index: 6;
 }
 .finder-shell.is-finding .finder-header {
   position: absolute;

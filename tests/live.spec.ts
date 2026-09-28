@@ -9,6 +9,7 @@ test.beforeEach(async ({ context }) => {
 });
 test("live response and contact remain available without a map or automatic dial", async ({
   page,
+  context,
 }) => {
   let submitted: RecommendationRequest | undefined;
   await page.route("**/api/recommendations", (r) => {
@@ -36,17 +37,155 @@ test("live response and contact remain available without a map or automatic dial
     page.getByRole("button", { name: "현재 위치", exact: true }),
   ).toBeEnabled();
   await fillNatural(page, 63);
+  // The device moved after the initial page fix. Search must refresh it.
+  await context.setGeolocation({
+    latitude: 37.4979,
+    longitude: 127.0276,
+    accuracy: 12,
+  });
   await page
     .getByRole("button", { name: /병원 (다시 )?찾기/, exact: true })
     .click();
   await expect(page.locator(".hospital-card")).toHaveCount(3);
   expect(submitted?.patient.ageYears).toBe(63);
+  expect(submitted?.origin).toMatchObject({
+    lat: 37.4979,
+    lng: 127.0276,
+    accuracyMeters: 12,
+  });
   expect(submitted?.patient.vitals.heartRate).toBeNull();
   await expect(page.getByText("지도를 표시할 수 없습니다")).toBeVisible();
   await page.getByRole("button", { name: "연동 검증 병원 1 전화" }).click();
   await expect(page.getByRole("dialog")).toContainText("02-0000-0000");
   await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
   await expect(page.getByRole("dialog")).toContainText("입력된 필요 자원");
+});
+
+test("failed location refresh never submits the old fix and a new search retries", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let denyNext = false;
+    let searching = false;
+    window.addEventListener("deny-next-location", () => {
+      denyNext = true;
+      searching = true;
+    });
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition(
+          success: PositionCallback,
+          failure: PositionErrorCallback,
+          options: PositionOptions,
+        ) {
+          if (denyNext) {
+            denyNext = false;
+            return failure({ code: 1 } as GeolocationPositionError);
+          }
+          if (options.maximumAge !== 0 || !options.enableHighAccuracy)
+            throw new Error("Fresh high accuracy fix required");
+          success({
+            coords: {
+              latitude: searching ? 37.4979 : 37.5663,
+              longitude: 127.0276,
+              accuracy: 10,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition);
+        },
+      },
+    });
+  });
+  const requests: RecommendationRequest[] = [];
+  await page.route("**/api/recommendations", (r) => {
+    const request = r.request().postDataJSON();
+    requests.push(request);
+    return r.fulfill({
+      json: { ...createFixture(request, "three"), isDemo: false },
+    });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await fillNatural(page);
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("deny-next-location")),
+  );
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("위치 권한");
+  await expect(page.locator(".finder-processing")).toHaveCount(0);
+  expect(requests).toHaveLength(0);
+  await expect(page.locator(".hospital-card")).toHaveCount(0);
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(3);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].origin.lat).toBe(37.4979);
+});
+
+test("cancelling location refresh ignores its late fix and allows another search", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let searchCalls = 0;
+    let armed = false;
+    window.addEventListener("hold-next-location", () => {
+      armed = true;
+    });
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition(success: PositionCallback) {
+          if (armed) searchCalls++;
+          const position = {
+            coords: {
+              latitude: searchCalls > 1 ? 37.53 : 37.51,
+              longitude: 127.0276,
+              accuracy: 10,
+            },
+            timestamp: Date.now(),
+          } as GeolocationPosition;
+          if (searchCalls === 1)
+            window.addEventListener(
+              "release-test-location",
+              () => success(position),
+              { once: true },
+            );
+          else success(position);
+        },
+      },
+    });
+  });
+  const requests: RecommendationRequest[] = [];
+  await page.route("**/api/recommendations", (r) => {
+    const request = r.request().postDataJSON();
+    requests.push(request);
+    return r.fulfill({
+      json: { ...createFixture(request, "three"), isDemo: false },
+    });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await fillNatural(page);
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("hold-next-location")),
+  );
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await expect(
+    page.locator(".finder-processing").getByRole("status"),
+  ).toHaveText("검색에 사용할 현재 위치를 확인하고 있어요");
+  await page.getByRole("button", { name: "검색 취소" }).click();
+  await page.evaluate(() =>
+    window.dispatchEvent(new Event("release-test-location")),
+  );
+  await expect(page.locator(".finder-processing")).toHaveCount(0);
+  await expect(page.locator(".hospital-card")).toHaveCount(0);
+  expect(requests).toHaveLength(0);
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(3);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].origin.lat).toBe(37.53);
 });
 test("live failure preserves input without inventing candidates; Demo works in live mode", async ({
   page,

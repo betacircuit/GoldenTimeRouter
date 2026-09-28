@@ -126,39 +126,48 @@ export default function App() {
     }
     setNatural(next);
   };
-  function locate(resetSearch = false) {
+  function locate({
+    resetSearch = false,
+    forSearch = false,
+  } = {}): Promise<Origin | null> {
     const id = ++locationRequest.current;
     setGeoBusy(true);
     setGeoError("");
+    if (forSearch) clearResults();
     if (!navigator.geolocation) {
       setGeoBusy(false);
       setGeoError("이 기기에서 위치를 확인할 수 없습니다.");
-      return;
+      return Promise.resolve(null);
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (id !== locationRequest.current) return;
-        setOrigin({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: "현재 위치",
-          accuracyMeters: pos.coords.accuracy,
-          capturedAt: new Date(pos.timestamp).toISOString(),
-        });
-        setGeoBusy(false);
-        clearResults();
-        setNeedsSearch(!resetSearch && (Boolean(response) || needsSearch));
-      },
-      (err) => {
-        if (id !== locationRequest.current) return;
-        setGeoBusy(false);
-        setGeoError(
-          err.code === 1
-            ? "위치 권한을 허용한 뒤 현재 위치를 눌러 주세요."
-            : "위치를 확인하지 못했습니다. 현재 위치를 다시 눌러 주세요.",
-        );
-      },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 30000 },
+    return new Promise((resolve) =>
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (id !== locationRequest.current) return resolve(null);
+          const currentOrigin: Origin = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            label: "현재 위치",
+            accuracyMeters: pos.coords.accuracy,
+            capturedAt: new Date(pos.timestamp).toISOString(),
+          };
+          setOrigin(currentOrigin);
+          setGeoBusy(false);
+          clearResults();
+          setNeedsSearch(!resetSearch && (Boolean(response) || needsSearch));
+          resolve(currentOrigin);
+        },
+        (err) => {
+          if (id !== locationRequest.current) return resolve(null);
+          setGeoBusy(false);
+          setGeoError(
+            err.code === 1
+              ? "위치 권한을 허용한 뒤 현재 위치를 눌러 주세요."
+              : "위치를 확인하지 못했습니다. 현재 위치를 다시 눌러 주세요.",
+          );
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+      ),
     );
   }
   async function recommend(
@@ -205,10 +214,6 @@ export default function App() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (searching.current || busy) return;
-    if (!origin) {
-      setError("현재 위치를 먼저 확인해 주세요.");
-      return;
-    }
     searching.current = true;
     setBusy(true);
     setError("");
@@ -224,8 +229,16 @@ export default function App() {
         setError("한 환자의 증상과 상태를 입력해 주세요.");
         return;
       }
+      // Keep an explicitly configured demo origin; real searches always use a
+      // fresh fix after extraction, immediately before the recommendation call.
+      const configuredDemo =
+        demoMode && new URLSearchParams(location.search).get("run") === "1";
+      const currentOrigin = configuredDemo
+        ? origin
+        : await locate({ forSearch: true });
+      if (!currentOrigin || id !== pipeline.current) return;
       await recommend(
-        { origin, patient: projectPatient(next.records) },
+        { origin: currentOrigin, patient: projectPatient(next.records) },
         demoMode,
         demoConfig,
       );
@@ -281,6 +294,8 @@ export default function App() {
   }
   function cancel() {
     pipeline.current++;
+    locationRequest.current++;
+    setGeoBusy(false);
     activeRequest.current?.abort();
     activeRequest.current = null;
     naturalRef.current?.cancel();
@@ -305,7 +320,7 @@ export default function App() {
         import.meta.env.VITE_DATA_MODE !== "live",
     );
     navigate("/");
-    void locate(true);
+    void locate({ resetSearch: true });
   }
   function openPhone(id: string) {
     select(id);
@@ -504,7 +519,7 @@ export default function App() {
       {busy && (
         <div className="finder-processing">
           <RequestProgress
-            phase={extracting ? "extract" : "recommend"}
+            phase={extracting ? "extract" : geoBusy ? "locate" : "recommend"}
             extraction={extracting}
             onCancel={cancel}
           />
