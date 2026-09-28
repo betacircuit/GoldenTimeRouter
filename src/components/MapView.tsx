@@ -10,6 +10,7 @@ import {
 import type { Candidate, Origin, Point, Route } from "../domain";
 import { hasKakaoKey, loadKakao } from "../services/kakao";
 import { highestProbability, mapViewport } from "../services/mapViewport";
+import { arrangeMapLabels } from "../services/mapLabels";
 
 interface Props {
   origin: Origin;
@@ -29,6 +30,7 @@ export default function MapView({
   demo,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const fallbackHost = useRef<HTMLDivElement>(null);
   const selectRef = useRef(onSelect);
   const selectedRef = useRef(selectedId);
   selectRef.current = onSelect;
@@ -55,6 +57,18 @@ export default function MapView({
     .join("|");
   const viewport = mapViewport(origin, candidates);
   const topIds = new Set(highestProbability(candidates).map((c) => c.id));
+  useEffect(() => {
+    const frame = fallbackHost.current;
+    if (!frame) return;
+    const arrange = () => arrangeMapLabels(frame);
+    const resize = new ResizeObserver(arrange);
+    resize.observe(frame);
+    const animation = requestAnimationFrame(arrange);
+    return () => {
+      resize.disconnect();
+      cancelAnimationFrame(animation);
+    };
+  }, [origin.lat, origin.lng, candidateKey, fallbackZoom, error]);
   useEffect(() => {
     setFallbackZoom(1);
   }, [origin.lat, origin.lng, candidateKey]);
@@ -129,11 +143,24 @@ export default function MapView({
           } else {
             button.setAttribute("aria-label", "출발 위치");
           }
+          let content: HTMLElement = button;
+          if (candidate) {
+            const anchor = document.createElement("div");
+            anchor.className = "map-label-anchor";
+            const leader = document.createElement("span");
+            leader.className = "map-label-leader";
+            leader.setAttribute("aria-hidden", "true");
+            const point = document.createElement("span");
+            point.className = "map-label-point";
+            point.setAttribute("aria-hidden", "true");
+            anchor.append(leader, point, button);
+            content = anchor;
+          }
           const overlay = new maps.CustomOverlay({
             position: new maps.LatLng(point.lat, point.lng),
-            content: button,
-            yAnchor: 0.5,
-            xAnchor: 0.5,
+            content,
+            yAnchor: candidate ? 0 : 0.5,
+            xAnchor: candidate ? 0 : 0.5,
             zIndex: candidate ? (topIds.has(candidate.id) ? 5 : 3) : 7,
           });
           overlay.setMap(map);
@@ -141,7 +168,17 @@ export default function MapView({
         };
         add(origin);
         candidates.forEach((c) => add(c.position, c));
-        const reset = () => map.setBounds(bounds, 65, 54, 60, 54);
+        const arrange = () => arrangeMapLabels(container);
+        let animation = 0;
+        const scheduleLabels = () => {
+          cancelAnimationFrame(animation);
+          animation = requestAnimationFrame(arrange);
+        };
+        maps.event.addListener(map, "idle", scheduleLabels);
+        const reset = () => {
+          map.setBounds(bounds, 85, 70, 75, 65);
+          scheduleLabels();
+        };
         recenter.current = reset;
         reset();
         const observer = new ResizeObserver(() => {
@@ -150,6 +187,8 @@ export default function MapView({
         });
         observer.observe(container);
         cleanup = () => {
+          cancelAnimationFrame(animation);
+          maps.event.removeListener(map, "idle", scheduleLabels);
           observer.disconnect();
           overlays.forEach((o) => o.setMap(null));
           markers.current.clear();
@@ -264,6 +303,7 @@ export default function MapView({
   const departure = project(origin);
   return (
     <div
+      ref={fallbackHost}
       className={"map-frame schematic " + (compact ? "compact" : "")}
       data-map-span-km={((viewport.north - viewport.south) * 111.32).toFixed(2)}
     >
@@ -315,33 +355,39 @@ export default function MapView({
       {candidates.map((c) => {
         const pos = project(c.position);
         return (
-          <button
-            type="button"
+          <div
             key={c.id}
-            className={
-              "map-marker schematic-marker " +
-              (topIds.has(c.id) ? "top-marker " : "") +
-              (c.id === selectedId ? "active" : "")
-            }
+            className="map-label-anchor schematic-anchor"
             style={{ left: pos.x + "%", top: pos.y + "%" }}
-            aria-label={c.rank + "위 " + c.name + " 지도에서 선택"}
-            aria-pressed={c.id === selectedId}
-            onClick={() => onSelect?.(c.id)}
           >
-            <span className="marker-number">{c.rank}</span>
-            <span className="marker-name">
-              {c.name.replace("데모 ", "")}
-              <small>
-                {c.durationSeconds === null
-                  ? "—"
-                  : Math.ceil(c.durationSeconds / 60) + "분"}{" "}
-                ·{" "}
-                {c.probability === null
-                  ? "—"
-                  : Math.round(c.probability * 100) + "%"}
-              </small>
-            </span>
-          </button>
+            <span className="map-label-leader" aria-hidden="true" />
+            <span className="map-label-point" aria-hidden="true" />
+            <button
+              type="button"
+              className={
+                "map-marker schematic-marker " +
+                (topIds.has(c.id) ? "top-marker " : "") +
+                (c.id === selectedId ? "active" : "")
+              }
+              aria-label={c.rank + "위 " + c.name + " 지도에서 선택"}
+              aria-pressed={c.id === selectedId}
+              onClick={() => onSelect?.(c.id)}
+            >
+              <span className="marker-number">{c.rank}</span>
+              <span className="marker-name">
+                {c.name.replace("데모 ", "")}
+                <small>
+                  {c.durationSeconds === null
+                    ? "—"
+                    : Math.ceil(c.durationSeconds / 60) + "분"}{" "}
+                  ·{" "}
+                  {c.probability === null
+                    ? "—"
+                    : Math.round(c.probability * 100) + "%"}
+                </small>
+              </span>
+            </button>
+          </div>
         );
       })}
       {controls(true)}

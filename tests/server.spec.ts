@@ -63,7 +63,8 @@ test("server snapshot retains unknown predictions and real contacts in the conci
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole("button", { name: "상단 바 열기" }).click();
   await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
   await page.getByRole("button", { name: "데모 병원 찾기" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
 });

@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  MapPin,
-  Phone,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, Clock3, MapPin, Phone, X } from "lucide-react";
 import {
   minutes,
   percent,
@@ -20,15 +12,11 @@ import { mockApi } from "../services/mock";
 
 export function HospitalGrid({
   response,
-  page,
-  onPage,
   selectedId,
   onSelect,
   onPhone,
 }: {
   response: RecommendationResponse | null;
-  page: number;
-  onPage: (p: number) => void;
   selectedId: string;
   onSelect: (id: string) => void;
   onPhone: (id: string) => void;
@@ -36,7 +24,25 @@ export function HospitalGrid({
   const candidates = [...(response?.candidates || [])].sort(
     (a, b) => a.rank - b.rank,
   );
-  const count = Math.ceil(candidates.length / 9);
+  const grid = useRef<HTMLDivElement>(null);
+  const drag = useRef({ pointer: -1, y: 0, scroll: 0, moved: false });
+  const [atBottom, setAtBottom] = useState(false);
+  useEffect(() => {
+    grid.current?.scrollTo({ top: 0 });
+    setAtBottom(false);
+  }, [response?.requestId]);
+  useEffect(() => {
+    if (selectedId)
+      grid.current
+        ?.querySelector<HTMLElement>(
+          `[data-hospital-id="${CSS.escape(selectedId)}"]`,
+        )
+        ?.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+          behavior: "smooth",
+        });
+  }, [selectedId]);
   return (
     <section className="hospital-grid-section" aria-label="병원 선택">
       {response && !candidates.length ? (
@@ -46,11 +52,60 @@ export function HospitalGrid({
           <p>환자 정보를 수정하거나 다른 데모 상황을 선택해 주세요.</p>
         </div>
       ) : (
-        <div className="hospital-grid">
+        <div
+          ref={grid}
+          className="hospital-grid"
+          tabIndex={0}
+          aria-label="병원 목록 스크롤"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 3);
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse" && e.button === 0)
+              drag.current = {
+                pointer: e.pointerId,
+                y: e.clientY,
+                scroll: e.currentTarget.scrollTop,
+                moved: false,
+              };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (d.pointer !== e.pointerId) return;
+            if (Math.abs(e.clientY - d.y) > 6) {
+              d.moved = true;
+              e.currentTarget.dataset.dragging = "true";
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }
+            if (d.moved) {
+              e.preventDefault();
+              e.currentTarget.scrollTop = d.scroll + d.y - e.clientY;
+            }
+          }}
+          onPointerUp={(e) => {
+            drag.current.pointer = -1;
+            delete e.currentTarget.dataset.dragging;
+            if (e.currentTarget.hasPointerCapture(e.pointerId))
+              e.currentTarget.releasePointerCapture(e.pointerId);
+          }}
+          onPointerCancel={(e) => {
+            drag.current.pointer = -1;
+            delete e.currentTarget.dataset.dragging;
+          }}
+          onClickCapture={(e) => {
+            if (drag.current.moved) {
+              e.preventDefault();
+              e.stopPropagation();
+              drag.current.moved = false;
+            }
+          }}
+        >
           {response
-            ? candidates.slice(page * 9, page * 9 + 9).map((c) => (
+            ? candidates.map((c) => (
                 <article
                   key={c.id}
+                  data-hospital-id={c.id}
                   className={`finder-card hospital-card ${c.rank <= 3 ? "priority-card" : ""} ${selectedId === c.id ? "is-selected" : ""}`}
                 >
                   <button
@@ -152,28 +207,21 @@ export function HospitalGrid({
           )}
         </div>
       )}
-      {count > 1 && (
-        <nav className="finder-pagination" aria-label="병원 목록 페이지">
-          <button
-            type="button"
-            aria-label="병원 목록 이전"
-            disabled={page === 0}
-            onClick={() => onPage(page - 1)}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span>
-            {page + 1} <i>/ {count}</i>
-          </span>
-          <button
-            type="button"
-            aria-label="병원 목록 다음"
-            disabled={page === count - 1}
-            onClick={() => onPage(page + 1)}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </nav>
+      {candidates.length > 9 && (
+        <button
+          type="button"
+          className="hospital-scroll-hint"
+          disabled={atBottom}
+          onClick={() =>
+            grid.current?.scrollBy({
+              top: grid.current.clientHeight * 0.7,
+              behavior: "smooth",
+            })
+          }
+        >
+          {atBottom ? "마지막 병원입니다" : "아래로 드래그해 더 보기"}
+          {!atBottom && <ChevronDown size={13} />}
+        </button>
       )}
     </section>
   );

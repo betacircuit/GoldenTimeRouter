@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
   Crosshair,
   Database,
   FlaskConical,
   Info,
+  Home,
   LoaderCircle,
   MapPin,
   Timer,
@@ -45,7 +48,7 @@ export default function App() {
   const [origin, setOrigin] = useState<Origin | null>(null);
   const [response, setResponse] = useState<RecommendationResponse | null>(null);
   const [selectedId, setSelectedId] = useState("");
-  const [page, setPage] = useState(0);
+  const [toolbarOpen, setToolbarOpen] = useState(false);
   const [demoMode, setDemoMode] = useState(isDemo);
   const [demoConfig, setDemoConfig] = useState(initialDemo);
   const [demoOpen, setDemoOpen] = useState(false);
@@ -63,10 +66,23 @@ export default function App() {
   const pipeline = useRef(0);
   const locationRequest = useRef(0);
   const searching = useRef(false);
+  const isEntry = location.pathname === "/";
+  const toolbarVisible = isEntry || toolbarOpen;
   const contactId = location.pathname.startsWith("/hospitals/")
     ? decodeURIComponent(location.pathname.slice(11))
     : "";
   const contact = response?.candidates.find((c) => c.id === contactId);
+
+  useEffect(() => {
+    setToolbarOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setToolbarOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
 
   useEffect(() => {
     document.title = "병원 찾기 · Golden Time Router";
@@ -100,7 +116,6 @@ export default function App() {
   const clearResults = () => {
     setResponse(null);
     setSelectedId("");
-    setPage(0);
     setError("");
   };
   const changeNatural = (next: NaturalDraft) => {
@@ -111,7 +126,7 @@ export default function App() {
     }
     setNatural(next);
   };
-  function locate() {
+  function locate(resetSearch = false) {
     const id = ++locationRequest.current;
     setGeoBusy(true);
     setGeoError("");
@@ -132,7 +147,7 @@ export default function App() {
         });
         setGeoBusy(false);
         clearResults();
-        setNeedsSearch(Boolean(response) || needsSearch);
+        setNeedsSearch(!resetSearch && (Boolean(response) || needsSearch));
       },
       (err) => {
         if (id !== locationRequest.current) return;
@@ -275,10 +290,22 @@ export default function App() {
   }
   function select(id: string) {
     setSelectedId(id);
-    const index = [...(response?.candidates || [])]
-      .sort((a, b) => a.rank - b.rank)
-      .findIndex((c) => c.id === id);
-    if (index >= 0) setPage(Math.floor(index / 9));
+  }
+  function goHome() {
+    cancel();
+    locationRequest.current++;
+    setNatural(initialNatural());
+    clearResults();
+    setOrigin(null);
+    setStartedAt(null);
+    setNeedsSearch(false);
+    setToolbarOpen(false);
+    setDemoMode(
+      import.meta.env.VITE_DATA_MODE !== "server" &&
+        import.meta.env.VITE_DATA_MODE !== "live",
+    );
+    navigate("/");
+    void locate(true);
   }
   function openPhone(id: string) {
     select(id);
@@ -286,18 +313,44 @@ export default function App() {
   }
 
   return (
-    <div className="finder-shell">
+    <div
+      className={`finder-shell ${isEntry ? "is-entry" : "is-finding"} ${toolbarOpen ? "toolbar-open" : ""}`}
+    >
       <a className="skip-link" href="#main-content">
         본문으로 이동
       </a>
-      <header className="finder-header">
+      {!isEntry && toolbarOpen && (
+        <button
+          className="toolbar-scrim"
+          aria-label="상단 바 접기"
+          onClick={() => setToolbarOpen(false)}
+        />
+      )}
+      {!isEntry && (
+        <button
+          type="button"
+          className="toolbar-toggle"
+          aria-label={toolbarOpen ? "상단 바 닫기" : "상단 바 열기"}
+          aria-controls="finder-toolbar"
+          aria-expanded={toolbarOpen}
+          onClick={() => setToolbarOpen((v) => !v)}
+        >
+          {toolbarOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+          <span>{toolbarOpen ? "닫기" : "메뉴"}</span>
+        </button>
+      )}
+      <header
+        id="finder-toolbar"
+        className={`finder-header ${toolbarVisible ? "is-open" : "is-closed"}`}
+        inert={!toolbarVisible}
+      >
         <a
           className="brand"
           href="/"
           aria-label="Golden Time Router 병원 찾기"
           onClick={(e) => {
             e.preventDefault();
-            navigate(response ? "/results" + location.search : "/");
+            goHome();
           }}
         >
           <svg
@@ -310,6 +363,11 @@ export default function App() {
           </svg>
         </a>
         <div className="finder-header-actions">
+          {!isEntry && (
+            <button type="button" className="toolbar-home" onClick={goHome}>
+              <Home size={17} /> 처음 화면
+            </button>
+          )}
           {demoMode && response && (
             <span className="demo-mode-label">DEMO</span>
           )}
@@ -321,13 +379,7 @@ export default function App() {
                 className="button ghost"
                 disabled={busy}
                 onClick={() => {
-                  setDemoMode(false);
-                  setNatural(initialNatural());
-                  clearResults();
-                  setStartedAt(null);
-                  setNeedsSearch(false);
-                  navigate("/");
-                  void locate();
+                  goHome();
                 }}
               >
                 실제 병원
@@ -336,14 +388,20 @@ export default function App() {
           <button
             className="icon-button"
             aria-label="데이터 근거"
-            onClick={() => setDataOpen(true)}
+            onClick={() => {
+              setToolbarOpen(false);
+              setDataOpen(true);
+            }}
           >
             <Database size={18} />
           </button>
           <button
             className="demo-launch"
             aria-label="데모 시나리오 설정"
-            onClick={() => setDemoOpen(true)}
+            onClick={() => {
+              setToolbarOpen(false);
+              setDemoOpen(true);
+            }}
             disabled={busy}
           >
             <FlaskConical size={18} /> Demo
@@ -386,8 +444,6 @@ export default function App() {
           )}
           <HospitalGrid
             response={response}
-            page={page}
-            onPage={setPage}
             selectedId={selectedId}
             onSelect={select}
             onPhone={openPhone}
@@ -428,7 +484,7 @@ export default function App() {
           <button
             type="button"
             className="current-location"
-            onClick={locate}
+            onClick={() => locate()}
             disabled={geoBusy || busy}
           >
             {geoBusy ? (

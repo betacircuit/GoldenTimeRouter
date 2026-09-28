@@ -8,14 +8,21 @@ test.beforeEach(async ({ context }) => {
 async function demo(page: Page, scenario = "normal") {
   await page.goto("/results?data=demo&run=1&scenario=" + scenario);
   await expect(
-    page.getByRole("button", { name: "데모 시나리오 설정" }),
+    page.getByRole("button", { name: /병원 (다시 )?찾기/, exact: true }),
   ).toBeEnabled();
+}
+async function openToolbar(page: Page) {
+  const toggle = page.getByRole("button", {
+    name: "상단 바 열기",
+    exact: true,
+  });
+  if (await toggle.isVisible()) await toggle.click();
 }
 test("unified 3 by 3 workspace fits desktop and tablet and omits removed controls", async ({
   page,
 }) => {
   await demo(page);
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
   await expect(page.locator(".priority-card")).toHaveCount(3);
   await expect(page.getByRole("button", { name: "주소 검색" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "정보 확인" })).toHaveCount(0);
@@ -24,7 +31,7 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
   await expect(page.locator(".hospital-grid")).not.toContainText("수용확률");
   for (const viewport of [
     { width: 1920, height: 1080 },
-    { width: 1366, height: 768 },
+    { width: 1366, height: 1024 },
     { width: 1024, height: 768 },
     { width: 768, height: 1024 },
   ]) {
@@ -54,9 +61,29 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
         ),
     ).toBe(true);
   }
-  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(page.getByRole("banner")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "상단 바 열기" }),
+  ).toBeVisible();
+  expect(
+    await page
+      .locator(".finder-shell")
+      .evaluate((el) => el.clientWidth / el.clientHeight),
+  ).toBeCloseTo(4 / 3);
+  for (const label of await page.locator(".map-marker .marker-name").all())
+    await expect(label).toBeVisible();
+  expect(
+    await page
+      .locator(".hospital-card")
+      .evaluateAll((nodes) =>
+        nodes.every(
+          (n) => getComputedStyle(n).backgroundColor === "rgb(255, 255, 255)",
+        ),
+      ),
+  ).toBe(true);
   await page.screenshot({
-    path: "test-results/finder-desktop.png",
+    path: "test-results/finder-ipad.png",
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -70,12 +97,28 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
     fullPage: true,
   });
 });
-test("phone shows a concise contact card, pagination and map selection survive navigation", async ({
+test("drag scroll reaches remaining hospitals and map selection returns to the right card", async ({
   page,
 }) => {
   await demo(page);
-  await page.getByRole("button", { name: "병원 목록 다음" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("navigation", { name: "병원 목록 페이지" }),
+  ).toHaveCount(0);
+  const grid = page.getByLabel("병원 목록 스크롤", { exact: true });
+  const bounds = (await grid.boundingBox())!;
+  await page.mouse.move(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height - 45,
+  );
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 45, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(() => grid.evaluate((el) => el.scrollTop))
+    .toBeGreaterThan(50);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "데모 푸른병원 전화" }).click();
   await expect(page).toHaveURL(/hospitals\/demo-10/);
   await expect(page.getByRole("dialog")).toContainText("02-0000-0010");
@@ -83,11 +126,13 @@ test("phone shows a concise contact card, pagination and map selection survive n
   await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator(".hospital-card")).toHaveCount(1);
+  await expect
+    .poll(() => grid.evaluate((el) => el.scrollTop))
+    .toBeGreaterThan(50);
   await page
     .getByRole("button", { name: "3위 데모 북서울병원 지도에서 선택" })
     .click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect.poll(() => grid.evaluate((el) => el.scrollTop)).toBeLessThan(10);
   await expect(
     page.getByRole("button", { name: "3위 데모 북서울병원 선택", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -134,7 +179,7 @@ test("editing patient text invalidates both cards and map, and search uses new e
   await expect(page.locator(".hospital-card")).toHaveCount(0);
   await expect(page.locator(".schematic-marker")).toHaveCount(0);
   await page.getByRole("button", { name: "병원 다시 찾기" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
   expect(calls).toBe(1);
 });
 for (const [scenario, count] of [
@@ -174,10 +219,11 @@ test("error scenario retains input and recovers through Demo", async ({
     "추천 정보를 불러오지 못했습니다",
   );
   await expect(page.getByLabel("환자 관찰 기록")).not.toHaveValue("");
+  await openToolbar(page);
   await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
   await page.getByLabel("응답 시나리오").selectOption("normal");
   await page.getByRole("button", { name: "데모 병원 찾기" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
 });
 test("map zooms into a nearby cluster and expands to contain distant top three", async ({
   page,
@@ -204,6 +250,35 @@ test("map zooms into a nearby cluster and expands to contain distant top three",
     expect(box.y).toBeGreaterThanOrEqual(frame.y);
     expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height);
   }
+});
+test("toolbar expands on demand and exits to a clean first screen", async ({
+  page,
+}) => {
+  await demo(page);
+  await expect(
+    page.getByRole("button", { name: "처음 화면", exact: true }),
+  ).toHaveCount(0);
+  await openToolbar(page);
+  await expect(
+    page.getByRole("button", { name: "상단 바 닫기", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("button", { name: "처음 화면", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "상단 바 열기", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await openToolbar(page);
+  await page.getByRole("button", { name: "처음 화면", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByLabel("환자 관찰 기록")).toHaveValue("");
+  await expect(page.locator(".hospital-card")).toHaveCount(0);
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(page.getByRole("button", { name: "병원 찾기", exact: true })).toBeEnabled();
+  await expect(page.getByRole("timer", { name: "출동 경과 시간" })).toHaveText(
+    "출동 경과00:00",
+  );
 });
 test("cancelled extraction cannot display late results", async ({ page }) => {
   await page.route("**/patient-api/extract", async (r) => {
@@ -256,6 +331,6 @@ test("location denial offers current-location retry and Demo still works", async
   ).toBeEnabled();
   await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
   await page.getByRole("button", { name: "데모 병원 찾기" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

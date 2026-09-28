@@ -69,7 +69,7 @@ test("live failure preserves input without inventing candidates; Demo works in l
   await expect(page.getByLabel("환자 관찰 기록")).not.toHaveValue("");
   await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
   await page.getByRole("button", { name: "데모 병원 찾기" }).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
   await page.getByRole("button", { name: "데모 중앙병원 전화" }).click();
   await expect(page.getByRole("dialog")).toContainText("시연용 가상 번호");
 });

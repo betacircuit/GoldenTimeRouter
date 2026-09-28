@@ -35,7 +35,7 @@ export default defineConfig({
       testMatch: "workflow.spec.ts",
       use: {
         ...devices["Desktop Chrome"],
-        viewport: { width: 1024, height: 1366 },
+        viewport: { width: 1024, height: 768 },
         isMobile: false,
         hasTouch: true,
       },
