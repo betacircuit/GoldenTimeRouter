@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Crosshair,
-  MapPinned,
-  Minus,
-  Navigation,
-  Plus,
-  RotateCcw,
-} from "lucide-react";
+import { Crosshair, MapPinned, Minus, Plus, RotateCcw } from "lucide-react";
 import type { Candidate, Origin, Point, Route } from "../domain";
 import { hasKakaoKey, loadKakao } from "../services/kakao";
-import { highestProbability, mapViewport } from "../services/mapViewport";
+import { destinationViewport, mapViewport } from "../services/mapViewport";
 import { arrangeMapLabels } from "../services/mapLabels";
+
+// A coordinate icon, not an inferred outline of the real building.
+const buildingIcon =
+  '<path d="M5 29V7h15v22M20 15h9v14M3 29h28M10 12h2m3 0h1M10 17h2m3 0h1M10 22h2m3 0h1M24 20h1m-1 5h1M11 29v-3h4v3" fill="white" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><g class="building-check"><circle cx="27" cy="28" r="7" fill="currentColor" stroke="white" stroke-width="1.5"/><path d="m24 28 2 2 4-4" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g>';
 
 interface Props {
   origin: Origin;
@@ -37,11 +34,15 @@ export default function MapView({
   selectedRef.current = selectedId;
   const recenter = useRef<(() => void) | null>(null);
   const zoom = useRef<((delta: number) => void) | null>(null);
+  const focusMap = useRef<((destination: Point) => void) | null>(null);
+  const chooseHospital = useRef<(candidate: Candidate) => void>(() => {});
+  const focusedRef = useRef("");
   const markers = useRef<Map<string, HTMLElement>>(new Map());
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [fallbackZoom, setFallbackZoom] = useState(1);
+  const [focusedId, setFocusedId] = useState("");
   const candidateKey = candidates
     .map((c) =>
       [
@@ -55,8 +56,24 @@ export default function MapView({
       ].join(":"),
     )
     .join("|");
-  const viewport = mapViewport(origin, candidates);
-  const topIds = new Set(highestProbability(candidates).map((c) => c.id));
+  const overview = mapViewport(origin, candidates);
+  const focused = candidates.find((c) => c.id === focusedId);
+  const viewport = focused
+    ? destinationViewport(origin, focused.position)
+    : overview;
+  const topIds = new Set(
+    [...candidates]
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 3)
+      .map((c) => c.id),
+  );
+  chooseHospital.current = (candidate) => {
+    selectRef.current?.(candidate.id);
+    focusedRef.current = candidate.id;
+    setFocusedId(candidate.id);
+    setFallbackZoom(1);
+    focusMap.current?.(candidate.position);
+  };
   useEffect(() => {
     const frame = fallbackHost.current;
     if (!frame) return;
@@ -68,9 +85,11 @@ export default function MapView({
       resize.disconnect();
       cancelAnimationFrame(animation);
     };
-  }, [origin.lat, origin.lng, candidateKey, fallbackZoom, error]);
+  }, [origin.lat, origin.lng, candidateKey, focusedId, fallbackZoom, error]);
   useEffect(() => {
     setFallbackZoom(1);
+    setFocusedId("");
+    focusedRef.current = "";
   }, [origin.lat, origin.lng, candidateKey]);
   useEffect(() => {
     markers.current.forEach((anchor, id) => {
@@ -100,103 +119,189 @@ export default function MapView({
           draggable: true,
           scrollwheel: true,
         });
-        zoom.current = (delta) =>
-          map.setLevel(Math.max(1, Math.min(12, map.getLevel() + delta)));
-        const bounds = new maps.LatLngBounds();
-        bounds.extend(new maps.LatLng(viewport.south, viewport.west));
-        bounds.extend(new maps.LatLng(viewport.north, viewport.east));
+        const reducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+        zoom.current = (delta) => {
+          const destination = candidates.find(
+            (c) => c.id === focusedRef.current,
+          );
+          map.setLevel(Math.max(1, Math.min(12, map.getLevel() + delta)), {
+            animate: reducedMotion ? false : { duration: 400 },
+            ...(destination
+              ? {
+                  anchor: new maps.LatLng(
+                    destination.position.lat,
+                    destination.position.lng,
+                  ),
+                }
+              : {}),
+          });
+        };
         const overlays: Array<{ setMap: (m: unknown) => void }> = [];
         const add = (point: Point, candidate?: Candidate) => {
+          if (!candidate) {
+            const marker = document.createElement("div");
+            marker.className = "user-location-marker";
+            marker.setAttribute("role", "img");
+            marker.setAttribute(
+              "aria-label",
+              demo ? "데모 출발 위치" : "현재 위치",
+            );
+            const dot = document.createElement("span");
+            dot.className = "user-location-dot";
+            const label = document.createElement("span");
+            label.className = "user-location-label";
+            label.textContent = demo ? "데모 출발" : "현재 위치";
+            marker.append(dot, label);
+            const overlay = new maps.CustomOverlay({
+              position: new maps.LatLng(point.lat, point.lng),
+              content: marker,
+              xAnchor: 0.5,
+              yAnchor: 0.5,
+              zIndex: 7,
+            });
+            overlay.setMap(map);
+            overlays.push(overlay);
+            return;
+          }
           const button = document.createElement("button");
           button.type = "button";
-          const selected = candidate?.id === selectedRef.current;
-          button.className = candidate
-            ? "map-marker " +
-              (topIds.has(candidate.id) ? "top-marker " : "") +
-              (selected ? "active" : "")
-            : "map-marker departure-pin";
-          if (candidate) {
-            const label = document.createElement("span");
-            label.className = "marker-name";
-            label.textContent = candidate.name.replace("데모 ", "");
-            button.append(label);
-            button.setAttribute(
-              "aria-label",
-              candidate.rank + "위 " + candidate.name + " 지도에서 선택",
-            );
-            button.setAttribute("aria-pressed", String(selected));
-            button.addEventListener("click", () =>
-              selectRef.current?.(candidate.id),
-            );
-          } else {
-            const badge = document.createElement("span");
-            badge.className = "marker-number";
-            badge.textContent = "+";
-            button.append(badge);
-            button.setAttribute("aria-label", "출발 위치");
-          }
-          let content: HTMLElement = button;
-          if (candidate) {
-            const anchor = document.createElement("div");
-            anchor.className = "map-label-anchor" + (selected ? " active" : "");
-            anchor.dataset.hospitalId = candidate.id;
-            const leader = document.createElement("span");
-            leader.className = "map-label-leader";
-            leader.setAttribute("aria-hidden", "true");
-            const target = document.createElement("button");
-            target.type = "button";
-            target.className =
-              "map-coordinate-target" + (selected ? " active" : "");
-            target.setAttribute(
-              "aria-label",
-              candidate.name + " 실제 위치 선택",
-            );
-            target.setAttribute("aria-pressed", String(selected));
-            target.addEventListener("click", () =>
-              selectRef.current?.(candidate.id),
-            );
-            anchor.append(leader, target, button);
-            markers.current.set(candidate.id, anchor);
-            content = anchor;
-          }
+          const selected = candidate.id === selectedRef.current;
+          button.className =
+            "map-marker " +
+            (topIds.has(candidate.id) ? "top-marker " : "") +
+            (selected ? "active" : "");
+          const label = document.createElement("span");
+          label.className = "marker-name";
+          label.textContent = candidate.name.replace("데모 ", "");
+          button.append(label);
+          button.setAttribute(
+            "aria-label",
+            candidate.rank + "위 " + candidate.name + " 지도에서 선택",
+          );
+          button.setAttribute("aria-pressed", String(selected));
+          button.addEventListener("click", () =>
+            chooseHospital.current(candidate),
+          );
+          const anchor = document.createElement("div");
+          anchor.className = "map-label-anchor" + (selected ? " active" : "");
+          anchor.dataset.hospitalId = candidate.id;
+          const leader = document.createElement("span");
+          leader.className = "map-label-leader";
+          leader.setAttribute("aria-hidden", "true");
+          const target = document.createElement("button");
+          target.type = "button";
+          target.className =
+            "map-coordinate-target" + (selected ? " active" : "");
+          target.setAttribute("aria-label", candidate.name + " 실제 위치 선택");
+          target.setAttribute("aria-pressed", String(selected));
+          const building = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "svg",
+          );
+          building.setAttribute("viewBox", "0 0 36 36");
+          building.setAttribute("class", "hospital-building");
+          building.setAttribute("aria-hidden", "true");
+          building.innerHTML = buildingIcon;
+          target.append(building);
+          target.addEventListener("click", () =>
+            chooseHospital.current(candidate),
+          );
+          anchor.append(leader, target, button);
+          markers.current.set(candidate.id, anchor);
           const overlay = new maps.CustomOverlay({
             position: new maps.LatLng(point.lat, point.lng),
-            content,
-            yAnchor: candidate ? 0 : 0.5,
-            xAnchor: candidate ? 0 : 0.5,
-            zIndex: candidate ? (topIds.has(candidate.id) ? 5 : 3) : 7,
+            content: anchor,
+            yAnchor: 0,
+            xAnchor: 0,
+            zIndex: topIds.has(candidate.id) ? 5 : 3,
           });
           overlay.setMap(map);
           overlays.push(overlay);
         };
         add(origin);
         candidates.forEach((c) => add(c.position, c));
-        const arrange = () => arrangeMapLabels(container);
+        const arrange = () => {
+          container.classList.toggle("is-building-view", map.getLevel() <= 3);
+          container.dataset.zoomLevel = String(map.getLevel());
+          arrangeMapLabels(container);
+        };
         let animation = 0;
         const scheduleLabels = () => {
           cancelAnimationFrame(animation);
           animation = requestAnimationFrame(arrange);
         };
         maps.event.addListener(map, "idle", scheduleLabels);
-        const reset = () => {
-          map.setBounds(bounds, 85, 70, 75, 65);
+        maps.event.addListener(map, "zoom_changed", scheduleLabels);
+        maps.event.addListener(map, "bounds_changed", scheduleLabels);
+        const fit = (view: typeof overview, animate = false) => {
+          const bounds = new maps.LatLngBounds();
+          bounds.extend(new maps.LatLng(view.south, view.west));
+          bounds.extend(new maps.LatLng(view.north, view.east));
+          if (animate && !reducedMotion) {
+            // Use the current projection to calculate a fitting zoom level,
+            // then animate center and zoom together without an intermediate jump.
+            const projection = map.getProjection();
+            const sw = projection.containerPointFromCoords(
+              new maps.LatLng(view.south, view.west),
+            );
+            const ne = projection.containerPointFromCoords(
+              new maps.LatLng(view.north, view.east),
+            );
+            const ratio = Math.max(
+              Math.abs(ne.x - sw.x) / Math.max(80, container.clientWidth - 150),
+              Math.abs(ne.y - sw.y) /
+                Math.max(80, container.clientHeight - 180),
+              0.01,
+            );
+            const level = Math.max(
+              1,
+              Math.min(12, map.getLevel() + Math.ceil(Math.log2(ratio))),
+            );
+            map.jump(
+              new maps.LatLng(
+                (view.south + view.north) / 2,
+                (view.west + view.east) / 2,
+              ),
+              level,
+              { animate: { duration: 550 } },
+            );
+          } else map.setBounds(bounds, 95, 75, 85, 75);
           scheduleLabels();
         };
-        recenter.current = reset;
+        focusMap.current = (point) =>
+          fit(destinationViewport(origin, point), true);
+        const reset = (animate = false) => {
+          focusedRef.current = "";
+          setFocusedId("");
+          fit(overview, animate);
+        };
+        recenter.current = () => reset(true);
         reset();
         const observer = new ResizeObserver(() => {
           map.relayout();
-          reset();
+          const destination = candidates.find(
+            (c) => c.id === focusedRef.current,
+          );
+          fit(
+            destination
+              ? destinationViewport(origin, destination.position)
+              : overview,
+          );
         });
         observer.observe(container);
         cleanup = () => {
           cancelAnimationFrame(animation);
           maps.event.removeListener(map, "idle", scheduleLabels);
+          maps.event.removeListener(map, "zoom_changed", scheduleLabels);
+          maps.event.removeListener(map, "bounds_changed", scheduleLabels);
           observer.disconnect();
           overlays.forEach((o) => o.setMap(null));
           markers.current.clear();
           recenter.current = null;
           zoom.current = null;
+          focusMap.current = null;
           container.replaceChildren();
         };
         setLoaded(true);
@@ -211,7 +316,7 @@ export default function MapView({
       disposed = true;
       cleanup();
     };
-  }, [origin.lat, origin.lng, candidateKey, attempt]);
+  }, [origin.lat, origin.lng, candidateKey, attempt, demo]);
 
   const controls = (fallback = false) => (
     <div className="map-tap-controls">
@@ -221,7 +326,7 @@ export default function MapView({
         aria-label="지도 확대"
         onClick={() =>
           fallback
-            ? setFallbackZoom((z) => Math.min(4, z * 1.3))
+            ? setFallbackZoom((z) => Math.min(32, z * 1.6))
             : zoom.current?.(-1)
         }
       >
@@ -233,7 +338,7 @@ export default function MapView({
         aria-label="지도 축소"
         onClick={() =>
           fallback
-            ? setFallbackZoom((z) => Math.max(0.5, z / 1.3))
+            ? setFallbackZoom((z) => Math.max(0.5, z / 1.6))
             : zoom.current?.(1)
         }
       >
@@ -243,7 +348,13 @@ export default function MapView({
         type="button"
         className="icon-button"
         aria-label="지도 범위 맞추기"
-        onClick={() => (fallback ? setFallbackZoom(1) : recenter.current?.())}
+        onClick={() => {
+          if (fallback) {
+            setFallbackZoom(1);
+            setFocusedId("");
+            focusedRef.current = "";
+          } else recenter.current?.();
+        }}
       >
         <Crosshair size={19} />
       </button>
@@ -255,6 +366,7 @@ export default function MapView({
       <div className={"map-frame " + (compact ? "compact" : "")}>
         <div
           className="kakao-host"
+          data-map-focus={focusedId}
           ref={host}
           aria-label="출발지와 후보 병원 지도"
         />
@@ -289,17 +401,29 @@ export default function MapView({
       </div>
     );
 
+  const center = {
+    lat: (viewport.south + viewport.north) / 2,
+    lng: (viewport.west + viewport.east) / 2,
+  };
+  const zoomCenter = focused
+    ? {
+        lat:
+          focused.position.lat -
+          (focused.position.lat - center.lat) / fallbackZoom,
+        lng:
+          focused.position.lng -
+          (focused.position.lng - center.lng) / fallbackZoom,
+      }
+    : center;
   const project = (p: Point) => ({
     x:
       50 +
-      ((p.lng - (viewport.west + viewport.east) / 2) /
-        (viewport.east - viewport.west)) *
+      ((p.lng - zoomCenter.lng) / (viewport.east - viewport.west)) *
         80 *
         fallbackZoom,
     y:
       50 -
-      ((p.lat - (viewport.south + viewport.north) / 2) /
-        (viewport.north - viewport.south)) *
+      ((p.lat - zoomCenter.lat) / (viewport.north - viewport.south)) *
         76 *
         fallbackZoom,
   });
@@ -307,8 +431,18 @@ export default function MapView({
   return (
     <div
       ref={fallbackHost}
-      className={"map-frame schematic " + (compact ? "compact" : "")}
-      data-map-span-km={((viewport.north - viewport.south) * 111.32).toFixed(2)}
+      className={
+        "map-frame schematic " +
+        (((viewport.north - viewport.south) * 111.32) / fallbackZoom <= 1.2
+          ? "is-building-view "
+          : "") +
+        (compact ? "compact" : "")
+      }
+      data-map-focus={focusedId}
+      data-map-span-km={(
+        ((viewport.north - viewport.south) * 111.32) /
+        fallbackZoom
+      ).toFixed(2)}
     >
       <svg
         className="demo-map-terrain"
@@ -347,13 +481,15 @@ export default function MapView({
         />
       </svg>
       <div
-        className="origin-marker"
+        className="user-location-marker schematic-origin"
+        role="img"
+        aria-label={demo ? "데모 출발 위치" : "현재 위치"}
         style={{ left: departure.x + "%", top: departure.y + "%" }}
       >
-        <span>
-          <Navigation size={17} fill="currentColor" />
+        <span className="user-location-dot" />
+        <span className="user-location-label">
+          {demo ? "데모 출발" : "현재 위치"}
         </span>
-        <label>출발</label>
       </div>
       {candidates.map((c) => {
         const pos = project(c.position);
@@ -375,8 +511,15 @@ export default function MapView({
               }
               aria-label={c.name + " 실제 위치 선택"}
               aria-pressed={c.id === selectedId}
-              onClick={() => onSelect?.(c.id)}
-            />
+              onClick={() => chooseHospital.current(c)}
+            >
+              <svg
+                viewBox="0 0 36 36"
+                className="hospital-building"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: buildingIcon }}
+              />
+            </button>
             <button
               type="button"
               className={
@@ -386,7 +529,7 @@ export default function MapView({
               }
               aria-label={c.rank + "위 " + c.name + " 지도에서 선택"}
               aria-pressed={c.id === selectedId}
-              onClick={() => onSelect?.(c.id)}
+              onClick={() => chooseHospital.current(c)}
             >
               <span className="marker-name">{c.name.replace("데모 ", "")}</span>
             </button>

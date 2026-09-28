@@ -27,6 +27,22 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
   await expect(page.getByRole("button", { name: "주소 검색" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "정보 확인" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "예시 입력" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "데이터 근거" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.locator(".patient-composer-heading, .patient-composer-footer"),
+  ).toHaveCount(0);
+  await expect(page.locator(".patient-composer")).not.toContainText("6,000");
+  const narrative = (await page.getByLabel("환자 관찰 기록").boundingBox())!;
+  const search = (await page
+    .getByRole("button", { name: "병원 찾기", exact: true })
+    .boundingBox())!;
+  expect(search.x).toBeGreaterThan(narrative.x + narrative.width);
+  expect(search.y).toBeCloseTo(narrative.y, 0);
+  expect(search.height).toBeCloseTo(narrative.height, 0);
+  expect(search.height).toBeGreaterThan(search.width);
+  expect(narrative.height).toBeGreaterThan(100);
   await expect(page.locator(".hospital-grid")).not.toContainText("소요시간");
   await expect(page.locator(".hospital-grid")).not.toContainText("수용확률");
   for (const viewport of [
@@ -37,6 +53,16 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
     { width: 768, height: 1024 },
   ]) {
     await page.setViewportSize(viewport);
+    // ResizeObserver refits the rows on the next rendering frame.
+    await expect
+      .poll(async () => {
+        const ninth = (await page
+          .locator(".hospital-card")
+          .nth(8)
+          .boundingBox())!;
+        return ninth.y + ninth.height;
+      })
+      .toBeLessThanOrEqual(viewport.height);
     const cards = await page.locator(".hospital-card").evaluateAll((nodes) =>
       nodes.map((n) => {
         const r = n.getBoundingClientRect();
@@ -49,6 +75,7 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
     expect(cards[8].bottom).toBeLessThanOrEqual(viewport.height);
     const gridBox = (await page.locator(".hospital-grid").boundingBox())!;
     expect(cards[8].bottom).toBeLessThanOrEqual(gridBox.y + gridBox.height);
+    expect(cards[9].y).toBeGreaterThanOrEqual(gridBox.y + gridBox.height);
     expect(
       await page.evaluate(
         () =>
@@ -65,6 +92,19 @@ test("unified 3 by 3 workspace fits desktop and tablet and omits removed control
     ).toBe(true);
   }
   await page.setViewportSize({ width: 1024, height: 768 });
+  const inner = (await page
+    .locator(".hospital-numbers")
+    .first()
+    .boundingBox())!;
+  const phone = (await page.locator(".hospital-phone").first().boundingBox())!;
+  expect(phone.y - inner.y - inner.height).toBeGreaterThanOrEqual(10);
+  for (const card of await page
+    .locator(".hospital-card:not(.priority-card)")
+    .all()) {
+    const rank = (await card.locator(".hospital-rank").boundingBox())!;
+    const name = (await card.locator(".hospital-card-name").boundingBox())!;
+    expect(rank.x).toBeCloseTo(name.x, 0);
+  }
   await expect(page.getByRole("banner")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "상단 바 열기" }),
@@ -264,6 +304,42 @@ test("map labels show only names and red targets stay exactly on hospital coordi
   ).toHaveCount(0);
   const anchors = page.locator(".map-label-anchor");
   await expect(anchors).toHaveCount(10);
+  // Public hospital names can contain long, unspaced legal entity prefixes.
+  await page
+    .locator(".map-label-anchor .marker-name")
+    .nth(8)
+    .evaluate((el) => {
+      el.textContent = "의료법인서울효천의료재단에이치플러스양지병원";
+    });
+  await page.setViewportSize({ width: 1024, height: 780 });
+  await expect
+    .poll(() =>
+      page
+        .locator(".map-label-anchor .marker-name")
+        .nth(8)
+        .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    )
+    .toBe(true);
+  const frameBox = (await page.locator(".map-frame").boundingBox())!;
+  const readableLabels = await page
+    .locator(".map-label-anchor .map-marker, .user-location-label")
+    .all();
+  for (let i = 0; i < readableLabels.length; i++) {
+    const a = (await readableLabels[i].boundingBox())!;
+    expect(a.x).toBeGreaterThanOrEqual(frameBox.x);
+    expect(a.y).toBeGreaterThanOrEqual(frameBox.y);
+    expect(a.x + a.width).toBeLessThanOrEqual(frameBox.x + frameBox.width);
+    expect(a.y + a.height).toBeLessThanOrEqual(frameBox.y + frameBox.height);
+    for (const other of readableLabels.slice(i + 1)) {
+      const b = (await other.boundingBox())!;
+      expect(
+        a.x < b.x + b.width &&
+          a.x + a.width > b.x &&
+          a.y < b.y + b.height &&
+          a.y + a.height > b.y,
+      ).toBe(false);
+    }
+  }
   for (const anchor of await anchors.all()) {
     const name = anchor.locator(".map-marker");
     await expect(name).toHaveText(/^[가-힣\s]+병원$/);
@@ -273,7 +349,7 @@ test("map labels show only names and red targets stay exactly on hospital coordi
     expect(targetBox.x + targetBox.width / 2).toBeCloseTo(point.x, 0);
     expect(targetBox.y + targetBox.height / 2).toBeCloseTo(point.y, 0);
     for (const label of await page
-      .locator(".map-label-anchor .map-marker")
+      .locator(".map-label-anchor .map-marker, .user-location-label")
       .all()) {
       const box = (await label.boundingBox())!;
       expect(
@@ -300,17 +376,85 @@ test("map labels show only names and red targets stay exactly on hospital coordi
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "지도 확대", exact: true }).click();
-  const point = (await page
+  // Even when zooming moves the coordinate off-screen, its label stays hidden
+  // instead of protruding over another hospital at the map edge.
+  const position = await page
     .locator('.map-label-anchor[data-hospital-id="demo-3"]')
-    .boundingBox())!;
-  const target = (await page
+    .evaluate((anchor) => {
+      const point = anchor.getBoundingClientRect();
+      const target = anchor
+        .querySelector(".map-coordinate-target")!
+        .getBoundingClientRect();
+      return {
+        dx: target.x + target.width / 2 - point.x,
+        dy: target.y + target.height / 2 - point.y,
+      };
+    });
+  expect(position.dx).toBeCloseTo(0, 0);
+  expect(position.dy).toBeCloseTo(0, 0);
+});
+
+test("selecting a hospital frames it with the user location and close zoom reveals building icons", async ({
+  page,
+}) => {
+  await demo(page, "clustered");
+  const map = page.locator(".schematic");
+  const overview = Number(await map.getAttribute("data-map-span-km"));
+  await expect(page.locator(".hospital-building").first()).toBeHidden();
+  await expect(page.locator(".top-marker")).toHaveCount(3);
+  await expect(page.locator(".departure-pin, .origin-marker")).toHaveCount(0);
+  await page
     .getByRole("button", {
-      name: "데모 북서울병원 실제 위치 선택",
+      name: "2위 데모 한빛병원 지도에서 선택",
       exact: true,
     })
-    .boundingBox())!;
-  expect(target.x + target.width / 2).toBeCloseTo(point.x, 0);
-  expect(target.y + target.height / 2).toBeCloseTo(point.y, 0);
+    .click();
+  await expect(map).toHaveAttribute("data-map-focus", "demo-2");
+  expect(Number(await map.getAttribute("data-map-span-km"))).toBeLessThan(
+    overview,
+  );
+  const frame = (await map.boundingBox())!;
+  for (const marker of [
+    page.getByRole("img", { name: "데모 출발 위치", exact: true }),
+    page.getByRole("button", {
+      name: "데모 한빛병원 실제 위치 선택",
+      exact: true,
+    }),
+  ]) {
+    const box = (await marker.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(frame.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(frame.x + frame.width);
+    expect(box.y).toBeGreaterThanOrEqual(frame.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height);
+  }
+  await page.getByRole("button", { name: "지도 확대", exact: true }).click();
+  await page.getByRole("button", { name: "지도 확대", exact: true }).click();
+  await expect(map).toHaveClass(/is-building-view/);
+  await expect(
+    page.locator(
+      '.map-label-anchor[data-hospital-id="demo-2"] .hospital-building',
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "지도 범위 맞추기", exact: true })
+    .click();
+  await expect(map).toHaveAttribute("data-map-focus", "");
+  await expect(page.locator(".hospital-building").first()).toBeHidden();
+  expect(Number(await map.getAttribute("data-map-span-km"))).toBe(overview);
+  await page
+    .getByRole("button", {
+      name: "4위 데모 서림병원 지도에서 선택",
+      exact: true,
+    })
+    .click();
+  expect(
+    await page
+      .getByRole("button", {
+        name: "4위 데모 서림병원 지도에서 선택",
+        exact: true,
+      })
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ).toBe("rgb(255, 255, 255)");
 });
 test("toolbar expands on demand and exits to a clean first screen", async ({
   page,
@@ -320,6 +464,17 @@ test("toolbar expands on demand and exits to a clean first screen", async ({
     page.getByRole("button", { name: "처음 화면", exact: true }),
   ).toHaveCount(0);
   await openToolbar(page);
+  await expect(page.locator(".demo-mode-label")).toHaveCount(0);
+  await expect(page.getByRole("banner")).not.toContainText(/DEMO|Demo/);
+  await expect
+    .poll(async () => {
+      const header = (await page.getByRole("banner").boundingBox())!;
+      const toggle = (await page
+        .getByRole("button", { name: "상단 바 닫기", exact: true })
+        .boundingBox())!;
+      return Math.abs(header.y + header.height - toggle.y);
+    })
+    .toBeLessThanOrEqual(2);
   await expect(
     page.getByRole("button", { name: "상단 바 닫기", exact: true }),
   ).toHaveAttribute("aria-expanded", "true");
@@ -371,6 +526,53 @@ test("cancelled extraction cannot display late results", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /병원 (다시 )?찾기/, exact: true }),
   ).toBeEnabled();
+});
+
+test("loading retains completed stages and fills every bar before showing results", async ({
+  page,
+}) => {
+  let releaseExtraction!: () => void;
+  const extractionGate = new Promise<void>((resolve) => {
+    releaseExtraction = resolve;
+  });
+  await page.route("**/patient-api/extract", async (r) => {
+    await extractionGate;
+    await r.fulfill({
+      json: {
+        ...exampleExtraction(),
+        model: "test",
+        inputVersion: r.request().postDataJSON().inputVersion,
+      },
+    });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await page.getByLabel("환자 관찰 기록").fill(EXAMPLE_TEXT);
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  const progress = page.getByLabel("요청 처리 진행 상황", { exact: true });
+  await expect(progress).toHaveAttribute("data-phase", "extract");
+  await expect(progress.getByRole("progressbar")).toHaveCount(3);
+  await expect(
+    progress.getByRole("progressbar", { name: "환자 정보 정리" }),
+  ).not.toHaveAttribute("aria-valuenow");
+  releaseExtraction();
+  await expect(progress).toHaveAttribute("data-phase", "recommend");
+  await expect(
+    progress.getByRole("progressbar", { name: "환자 정보 정리" }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  await expect(
+    progress.getByRole("progressbar", { name: "현재 위치 확인" }),
+  ).toHaveAttribute("aria-valuenow", "100");
+  await expect
+    .poll(() => progress.locator('.stage-track[aria-valuenow="100"]').count(), {
+      intervals: [20],
+    })
+    .toBe(3);
+  await expect(progress).toHaveAttribute("data-phase", "complete");
+  await expect(progress).toHaveCount(0);
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
 });
 test("location denial offers current-location retry and Demo still works", async ({
   page,

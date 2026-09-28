@@ -210,7 +210,7 @@ export function configureDemo(
       const probability =
         config.scenario === "mixed" && i === 1
           ? null
-          : metric.probability / 100;
+          : Math.max(0, metric.probability) / 100;
       return {
         ...c,
         position: {

@@ -7,6 +7,107 @@ test.beforeEach(async ({ context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 37.5663, longitude: 126.9779 });
 });
+
+test("real cards keep unknown values and hour durations readable and open meaningful details", async ({
+  page,
+}) => {
+  await page.route("**/api/recommendations", (r) => {
+    const response = createFixture(r.request().postDataJSON());
+    response.isDemo = false;
+    response.rankingBasis = "eta";
+    response.candidates.forEach((c, i) => {
+      c.name =
+        i === 5
+          ? "의료법인서울효천의료재단에이치플러스양지병원"
+          : `검증 병원 ${i + 1}`;
+      c.durationSeconds =
+        i === 0
+          ? 80 * 60
+          : i === 1
+            ? 120 * 60
+            : i === 2
+              ? null
+              : c.durationSeconds;
+      c.probability = i === 0 ? -0.2 : i === 1 ? 0 : null;
+      c.resources = [
+        { name: "외상 진료", status: "unknown" },
+        { name: "CT", status: "unmet" },
+      ];
+    });
+    return r.fulfill({ json: response });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await expect(page.locator(".hospital-grid")).toHaveCount(0);
+  expect(
+    (await page.getByLabel("환자 관찰 기록").boundingBox())!.height,
+  ).toBeGreaterThan(400);
+  await expect(
+    page.getByText("현재 위치 확인됨", { exact: true }),
+  ).toBeVisible();
+  await fillNatural(page, 63);
+  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(10);
+  await expect(page.locator(".hospital-card").nth(0)).toContainText(
+    "1시간 20분",
+  );
+  await expect(page.locator(".hospital-card").nth(1)).toContainText("2시간");
+  await expect(page.locator(".hospital-card").nth(0)).toContainText("0%");
+  await expect(page.locator(".hospital-card").nth(2)).toContainText(
+    "정보 없음",
+  );
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1186, height: 730 },
+    { width: 768, height: 1024 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const metrics = await page
+      .locator(".hospital-numbers")
+      .evaluateAll((nodes) =>
+        nodes.map((el) => {
+          const a = el.children[0]
+            .querySelector("strong")!
+            .getBoundingClientRect();
+          const b = el.children[1]
+            .querySelector("strong")!
+            .getBoundingClientRect();
+          const metric = el.getBoundingClientRect();
+          const phone = el
+            .closest("article")!
+            .querySelector(".hospital-phone")!
+            .getBoundingClientRect();
+          return {
+            overlap: a.right > b.left,
+            overflow: b.right > metric.right,
+            gap: phone.top - metric.bottom,
+            wrapped: [...el.querySelectorAll("strong")].some(
+              (n) => n.scrollWidth > n.clientWidth + 1,
+            ),
+          };
+        }),
+      );
+    for (const metric of metrics) {
+      expect(metric.overlap || metric.overflow || metric.wrapped).toBe(false);
+      expect(metric.gap).toBeGreaterThanOrEqual(8);
+    }
+  }
+  await page
+    .getByRole("button", { name: "1위 검증 병원 1 선택", exact: true })
+    .click();
+  const details = page.getByRole("dialog", {
+    name: "검증 병원 1",
+    exact: true,
+  });
+  await expect(details).toContainText("환자에게 맞는 부분");
+  await expect(details).toContainText("외상 진료 · 가능 여부 미확인");
+  await expect(details).toContainText("CT · 필요 자원 미충족");
+  await expect(details).toContainText("환자별 치료 적합도 순위는 아닙니다");
+  await page.getByRole("button", { name: "병원 상세 닫기" }).click();
+  await expect(details).toHaveCount(0);
+});
 test("live response and contact remain available without a map or automatic dial", async ({
   page,
   context,

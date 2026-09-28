@@ -153,7 +153,10 @@ export default function DemoSettings({
                     ...config,
                     metrics: config.metrics.map((v, j) =>
                       j === i
-                        ? { ...v, probability: Number(e.target.value) }
+                        ? {
+                            ...v,
+                            probability: Math.max(0, Number(e.target.value)),
+                          }
                         : v,
                     ),
                   })

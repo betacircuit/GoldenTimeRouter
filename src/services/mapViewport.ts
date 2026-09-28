@@ -1,4 +1,23 @@
-import type { Candidate, Origin } from "../domain";
+import type { Candidate, Origin, Point } from "../domain";
+
+// Frame a selected destination together with the actual departure coordinate.
+export function destinationViewport(origin: Origin, destination: Point) {
+  const lngKm = 111.32 * Math.cos((origin.lat * Math.PI) / 180);
+  const latPadding = Math.max(
+    0.15 / 111.32,
+    Math.abs(destination.lat - origin.lat) * 0.12,
+  );
+  const lngPadding = Math.max(
+    0.15 / lngKm,
+    Math.abs(destination.lng - origin.lng) * 0.12,
+  );
+  return {
+    south: Math.min(origin.lat, destination.lat) - latPadding,
+    north: Math.max(origin.lat, destination.lat) + latPadding,
+    west: Math.min(origin.lng, destination.lng) - lngPadding,
+    east: Math.max(origin.lng, destination.lng) + lngPadding,
+  };
+}
 
 export function highestProbability(candidates: Candidate[]) {
   return [...candidates]
@@ -9,7 +28,7 @@ export function highestProbability(candidates: Candidate[]) {
     .slice(0, 3);
 }
 
-// Use 10 km by default; zoom into a compact cluster, or out for distant top picks.
+// Show the immediate neighborhood first, then fit the actual candidate set.
 export function mapViewport(origin: Origin, candidates: Candidate[]) {
   const lngKm = 111.32 * Math.cos((origin.lat * Math.PI) / 180);
   const distance = (c: Candidate) =>
@@ -20,10 +39,10 @@ export function mapViewport(origin: Origin, candidates: Candidate[]) {
   const top = highestProbability(candidates);
   if (!candidates.length)
     return {
-      south: origin.lat - 10 / 111.32,
-      north: origin.lat + 10 / 111.32,
-      west: origin.lng - 10 / lngKm,
-      east: origin.lng + 10 / lngKm,
+      south: origin.lat - 0.35 / 111.32,
+      north: origin.lat + 0.35 / 111.32,
+      west: origin.lng - 0.35 / lngKm,
+      east: origin.lng + 0.35 / lngKm,
     };
   const points = [
     origin,

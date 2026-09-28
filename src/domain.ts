@@ -52,7 +52,11 @@ export const candidateSchema = z.object({
   durationSeconds: z.number().nonnegative().nullable(),
   distanceMeters: z.number().nonnegative().nullable(),
   distanceKind: z.enum(["road", "straight"]).optional(),
-  probability: z.number().min(0).max(1).nullable(),
+  probability: z
+    .number()
+    .max(1)
+    .transform((value) => Math.max(0, value))
+    .nullable(),
   interval: intervalSchema.nullable(),
   resources: z.array(resourceSchema),
   reasons: z.array(z.string()),
@@ -137,9 +141,20 @@ export type Scenario = "normal" | "three" | "empty" | "mixed" | "error";
 export type Sort = "rank" | "eta";
 
 export const percent = (value: number | null) =>
-  value === null ? "예측 정보 없음" : `${Math.round(value * 100)}%`;
-export const minutes = (seconds: number | null) =>
-  seconds === null ? "조회 불가" : `${Math.ceil(seconds / 60)}분`;
+  value === null
+    ? "예측 정보 없음"
+    : `${Math.round(Math.max(0, value) * 100)}%`;
+export const minutes = (seconds: number | null) => {
+  if (seconds === null) return "조회 불가";
+  const total = Math.ceil(seconds / 60);
+  return total < 60
+    ? `${total}분`
+    : `${Math.floor(total / 60)}시간${total % 60 ? ` ${total % 60}분` : ""}`;
+};
+export const elapsedTime = (seconds: number) => {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${seconds >= 3600 ? `${Math.floor(seconds / 3600)}:` : ""}${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+};
 export const clockTime = (value: string | Date) =>
   new Date(value).toLocaleTimeString("ko-KR", {
     hour: "2-digit",

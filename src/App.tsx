@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowRight,
+  Search,
   ChevronDown,
-  ChevronUp,
   Crosshair,
-  Database,
   FlaskConical,
   Info,
   Home,
@@ -16,6 +14,8 @@ import {
 } from "lucide-react";
 import {
   requestSchema,
+  clockTime,
+  elapsedTime,
   type Origin,
   type RecommendationResponse,
   type RecommendationRequest,
@@ -37,9 +37,11 @@ import NaturalPatient, {
 } from "./components/NaturalPatient";
 import MapView from "./components/MapView";
 import { HospitalGrid, HospitalContact } from "./components/HospitalGrid";
+import HospitalDetails from "./components/HospitalDetails";
 import DemoSettings from "./components/DemoSettings";
-import DataEvidence from "./components/DataEvidence";
-import RequestProgress from "./components/RequestProgress";
+import RequestProgress, {
+  type RequestPhase,
+} from "./components/RequestProgress";
 
 export default function App() {
   const navigate = useNavigate();
@@ -48,13 +50,18 @@ export default function App() {
   const [origin, setOrigin] = useState<Origin | null>(null);
   const [response, setResponse] = useState<RecommendationResponse | null>(null);
   const [selectedId, setSelectedId] = useState("");
+  const [detailId, setDetailId] = useState("");
   const [toolbarOpen, setToolbarOpen] = useState(false);
   const [demoMode, setDemoMode] = useState(isDemo);
   const [demoConfig, setDemoConfig] = useState(initialDemo);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [dataOpen, setDataOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [extracting, setExtracting] = useState(false);
+  const [requestPhase, setRequestPhase] = useState<RequestPhase | "complete">(
+    "recommend",
+  );
+  const [requestSteps, setRequestSteps] = useState<RequestPhase[]>([
+    "recommend",
+  ]);
   const [error, setError] = useState("");
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState("");
@@ -72,6 +79,7 @@ export default function App() {
     ? decodeURIComponent(location.pathname.slice(11))
     : "";
   const contact = response?.candidates.find((c) => c.id === contactId);
+  const detail = response?.candidates.find((c) => c.id === detailId);
 
   useEffect(() => {
     setToolbarOpen(false);
@@ -114,6 +122,7 @@ export default function App() {
   }, [contactId, contact, busy]);
 
   const clearResults = () => {
+    setDetailId("");
     setResponse(null);
     setSelectedId("");
     setError("");
@@ -196,6 +205,10 @@ export default function App() {
       const next = demo
         ? configureDemo(result, config, request.origin, request.patient)
         : result;
+      setRequestPhase("complete");
+      // Let the finished bars paint before opening the results.
+      await new Promise((resolve) => window.setTimeout(resolve, 420));
+      if (controller.signal.aborted) return;
       setResponse(next);
       setNeedsSearch(false);
       setSelectedId(next.candidates[0]?.id || "");
@@ -214,6 +227,14 @@ export default function App() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (searching.current || busy) return;
+    const configuredDemo =
+      demoMode && new URLSearchParams(location.search).get("run") === "1";
+    setRequestSteps(
+      configuredDemo
+        ? ["extract", "recommend"]
+        : ["extract", "locate", "recommend"],
+    );
+    setRequestPhase("extract");
     searching.current = true;
     setBusy(true);
     setError("");
@@ -231,12 +252,12 @@ export default function App() {
       }
       // Keep an explicitly configured demo origin; real searches always use a
       // fresh fix after extraction, immediately before the recommendation call.
-      const configuredDemo =
-        demoMode && new URLSearchParams(location.search).get("run") === "1";
+      if (!configuredDemo) setRequestPhase("locate");
       const currentOrigin = configuredDemo
         ? origin
         : await locate({ forSearch: true });
       if (!currentOrigin || id !== pipeline.current) return;
+      setRequestPhase("recommend");
       await recommend(
         { origin: currentOrigin, patient: projectPatient(next.records) },
         demoMode,
@@ -278,6 +299,8 @@ export default function App() {
     });
     const id = ++pipeline.current;
     searching.current = true;
+    setRequestSteps(["recommend"]);
+    setRequestPhase("recommend");
     setBusy(true);
     try {
       await recommend(
@@ -301,7 +324,6 @@ export default function App() {
     naturalRef.current?.cancel();
     searching.current = false;
     setBusy(false);
-    setExtracting(false);
   }
   function select(id: string) {
     setSelectedId(id);
@@ -323,13 +345,14 @@ export default function App() {
     void locate({ resetSearch: true });
   }
   function openPhone(id: string) {
+    setDetailId("");
     select(id);
     navigate("/hospitals/" + encodeURIComponent(id) + location.search);
   }
 
   return (
     <div
-      className={`finder-shell ${isEntry ? "is-entry" : "is-finding"} ${toolbarOpen ? "toolbar-open" : ""}`}
+      className={`finder-shell ${isEntry ? "is-entry" : "is-finding"} ${!response ? "is-preparing" : ""} ${toolbarOpen ? "toolbar-open" : ""}`}
     >
       <a className="skip-link" href="#main-content">
         본문으로 이동
@@ -341,88 +364,81 @@ export default function App() {
           onClick={() => setToolbarOpen(false)}
         />
       )}
-      {!isEntry && (
-        <button
-          type="button"
-          className="toolbar-toggle"
-          aria-label={toolbarOpen ? "상단 바 닫기" : "상단 바 열기"}
-          aria-controls="finder-toolbar"
-          aria-expanded={toolbarOpen}
-          onClick={() => setToolbarOpen((v) => !v)}
-        >
-          {toolbarOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-          <span>{toolbarOpen ? "닫기" : "메뉴"}</span>
-        </button>
-      )}
-      <header
-        id="finder-toolbar"
-        className={`finder-header ${toolbarVisible ? "is-open" : "is-closed"}`}
-        inert={!toolbarVisible}
+      <div
+        className={`finder-toolbar-panel ${toolbarVisible ? "is-open" : "is-closed"}`}
       >
-        <a
-          className="brand"
-          href="/"
-          aria-label="Golden Time Router 병원 찾기"
-          onClick={(e) => {
-            e.preventDefault();
-            goHome();
-          }}
-        >
-          <svg
-            className="brand-logo"
-            role="img"
-            aria-label="Golden Time Router 로고"
-            viewBox="35 410 1180 435"
+        {!isEntry && (
+          <button
+            type="button"
+            className="toolbar-toggle"
+            aria-label={toolbarOpen ? "상단 바 닫기" : "상단 바 열기"}
+            aria-controls="finder-toolbar"
+            aria-expanded={toolbarOpen}
+            onClick={() => setToolbarOpen((v) => !v)}
           >
-            <image href="/gtr-logo.png" width="1254" height="1254" />
-          </svg>
-        </a>
-        <div className="finder-header-actions">
-          {!isEntry && (
-            <button type="button" className="toolbar-home" onClick={goHome}>
-              <Home size={17} /> 처음 화면
-            </button>
-          )}
-          {demoMode && response && (
-            <span className="demo-mode-label">DEMO</span>
-          )}
-          {demoMode &&
-            (import.meta.env.VITE_DATA_MODE === "server" ||
-              import.meta.env.VITE_DATA_MODE === "live") && (
-              <button
-                type="button"
-                className="button ghost"
-                disabled={busy}
-                onClick={() => {
-                  goHome();
-                }}
-              >
-                실제 병원
+            <ChevronDown size={17} />
+            <span>{toolbarOpen ? "닫기" : "메뉴"}</span>
+          </button>
+        )}
+        <header
+          id="finder-toolbar"
+          className={`finder-header ${toolbarVisible ? "is-open" : "is-closed"}`}
+          inert={!toolbarVisible}
+          aria-hidden={!toolbarVisible}
+        >
+          <a
+            className="brand"
+            href="/"
+            aria-label="Golden Time Router 병원 찾기"
+            onClick={(e) => {
+              e.preventDefault();
+              goHome();
+            }}
+          >
+            <svg
+              className="brand-logo"
+              role="img"
+              aria-label="Golden Time Router 로고"
+              viewBox="35 410 1180 435"
+            >
+              <image href="/gtr-logo.png" width="1254" height="1254" />
+            </svg>
+          </a>
+          <div className="finder-header-actions">
+            {!isEntry && (
+              <button type="button" className="toolbar-home" onClick={goHome}>
+                <Home size={17} /> 처음 화면
               </button>
             )}
-          <button
-            className="icon-button"
-            aria-label="데이터 근거"
-            onClick={() => {
-              setToolbarOpen(false);
-              setDataOpen(true);
-            }}
-          >
-            <Database size={18} />
-          </button>
-          <button
-            className="demo-launch"
-            aria-label="데모 시나리오 설정"
-            onClick={() => {
-              setToolbarOpen(false);
-              setDemoOpen(true);
-            }}
-            disabled={busy}
-          >
-            <FlaskConical size={18} /> Demo
-          </button>
-        </div>
-      </header>
+            {demoMode &&
+              (import.meta.env.VITE_DATA_MODE === "server" ||
+                import.meta.env.VITE_DATA_MODE === "live") && (
+                <button
+                  type="button"
+                  className="button ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    goHome();
+                  }}
+                >
+                  실제 병원
+                </button>
+              )}
+            <button
+              className="demo-launch"
+              aria-label="데모 시나리오 설정"
+              title="데모 시나리오 설정"
+              onClick={() => {
+                setToolbarOpen(false);
+                setDemoOpen(true);
+              }}
+              disabled={busy}
+            >
+              <FlaskConical size={20} />
+            </button>
+          </div>
+        </header>
+      </div>
       <main id="main-content" className="finder-layout">
         <div className="finder-left">
           <form onSubmit={submit}>
@@ -430,20 +446,25 @@ export default function App() {
               value={natural}
               onChange={changeNatural}
               disabled={busy}
-              onBusy={setExtracting}
+              onBusy={(value) => {
+                if (value) setRequestPhase("extract");
+              }}
               controlRef={naturalRef}
               action={
                 <button
                   type="submit"
                   className="button primary finder-search"
+                  aria-label={needsSearch ? "병원 다시 찾기" : "병원 찾기"}
                   disabled={busy || geoBusy}
                 >
                   {busy ? (
                     <LoaderCircle size={17} className="spin" />
                   ) : (
-                    <ArrowRight size={17} />
-                  )}{" "}
-                  {needsSearch ? "병원 다시 찾기" : "병원 찾기"}
+                    <Search size={21} />
+                  )}
+                  <span>
+                    병원<span>{needsSearch ? "다시 찾기" : "찾기"}</span>
+                  </span>
                 </button>
               }
             />
@@ -457,12 +478,17 @@ export default function App() {
               </button>
             </div>
           )}
-          <HospitalGrid
-            response={response}
-            selectedId={selectedId}
-            onSelect={select}
-            onPhone={openPhone}
-          />
+          {response && (
+            <HospitalGrid
+              response={response}
+              selectedId={selectedId}
+              onSelect={(id) => {
+                select(id);
+                setDetailId(id);
+              }}
+              onPhone={openPhone}
+            />
+          )}
         </div>
         <section className="finder-map" aria-label="병원 위치 비교">
           {origin ? (
@@ -484,17 +510,14 @@ export default function App() {
             </div>
           )}
           <div
-            className="dispatch-timer"
+            className={`dispatch-timer ${elapsed >= 3600 ? "has-hours" : ""}`}
             role="timer"
             aria-label="출동 경과 시간"
             aria-live="off"
           >
             <Timer size={17} />
             <span>출동 경과</span>
-            <strong>
-              {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
-              {String(elapsed % 60).padStart(2, "0")}
-            </strong>
+            <strong>{elapsedTime(elapsed)}</strong>
           </div>
           <button
             type="button"
@@ -509,6 +532,25 @@ export default function App() {
             )}{" "}
             현재 위치
           </button>
+          {!response && origin && !demoMode && !geoError && (
+            <div className="location-status" role="status">
+              <strong>
+                {geoBusy
+                  ? "위치 갱신 중"
+                  : (origin.accuracyMeters ?? 0) > 1000
+                    ? "현재 위치 확인 · 오차 큼"
+                    : "현재 위치 확인됨"}
+              </strong>
+              <span>
+                {origin.accuracyMeters !== undefined
+                  ? `정확도 약 ${Math.round(origin.accuracyMeters).toLocaleString()} m`
+                  : "정확도 미제공"}
+                {origin.capturedAt
+                  ? ` · ${clockTime(origin.capturedAt)} 확인`
+                  : ""}
+              </span>
+            </div>
+          )}
           {geoError && (
             <div className="finder-location-error" role="alert">
               {geoError}
@@ -519,8 +561,8 @@ export default function App() {
       {busy && (
         <div className="finder-processing">
           <RequestProgress
-            phase={extracting ? "extract" : geoBusy ? "locate" : "recommend"}
-            extraction={extracting}
+            phase={requestPhase}
+            steps={requestSteps}
             onCancel={cancel}
           />
         </div>
@@ -541,7 +583,14 @@ export default function App() {
           close={() => navigate("/results" + location.search)}
         />
       )}
-      {dataOpen && <DataEvidence onClose={() => setDataOpen(false)} />}
+      {detail && response && (
+        <HospitalDetails
+          candidate={detail}
+          response={response}
+          close={() => setDetailId("")}
+          onPhone={() => openPhone(detail.id)}
+        />
+      )}
     </div>
   );
 }

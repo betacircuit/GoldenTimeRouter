@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Clock3, MapPin, Phone, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Check, ChevronDown, MapPin, Phone, X } from "lucide-react";
 import {
   minutes,
   percent,
@@ -27,6 +27,26 @@ export function HospitalGrid({
   const grid = useRef<HTMLDivElement>(null);
   const drag = useRef({ pointer: -1, y: 0, scroll: 0, moved: false });
   const [atBottom, setAtBottom] = useState(false);
+  useLayoutEffect(() => {
+    const el = grid.current;
+    if (!el) return;
+    const fitThreeRows = () => {
+      const style = getComputedStyle(el);
+      const space =
+        el.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom) -
+        2 * parseFloat(style.rowGap);
+      el.style.setProperty(
+        "--hospital-row-height",
+        `${Math.max(136, Math.floor(space / 3))}px`,
+      );
+    };
+    fitThreeRows();
+    const observer = new ResizeObserver(fitThreeRows);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [response?.requestId]);
   useEffect(() => {
     grid.current?.scrollTo({ top: 0 });
     setAtBottom(false);
@@ -131,14 +151,19 @@ export function HospitalGrid({
                       <span
                         aria-label={`예상 이동 시간 ${minutes(c.durationSeconds)}`}
                       >
-                        <Clock3 size={15} />
                         <strong
                           className={
-                            c.durationSeconds === null ? "missing-value" : ""
+                            c.durationSeconds === null
+                              ? "missing-value"
+                              : c.durationSeconds > 3540
+                                ? "long-duration"
+                                : ""
                           }
                         >
                           {c.durationSeconds === null ? (
                             "조회 불가"
+                          ) : c.durationSeconds > 3540 ? (
+                            minutes(c.durationSeconds)
                           ) : (
                             <>
                               {Math.ceil(c.durationSeconds / 60)
@@ -159,7 +184,7 @@ export function HospitalGrid({
                             "정보 없음"
                           ) : (
                             <>
-                              {Math.round(c.probability * 100)}
+                              {Math.round(Math.max(0, c.probability) * 100)}
                               <small>%</small>
                             </>
                           )}
@@ -183,7 +208,12 @@ export function HospitalGrid({
                     onClick={() => onPhone(c.id)}
                     aria-label={`${c.name} 전화`}
                   >
-                    <Phone size={14} /> 전화
+                    <Phone
+                      size={14}
+                      strokeWidth={1.7}
+                      className="hospital-phone-icon"
+                    />
+                    <span>전화</span>
                   </button>
                 </article>
               ))
@@ -198,13 +228,6 @@ export function HospitalGrid({
                   <div />
                 </div>
               ))}
-          {!response && (
-            <div className="grid-invitation">
-              <MapPin size={22} />
-              <strong>어느 병원으로 갈까요?</strong>
-              <span>환자 정보를 입력하고 병원을 찾아보세요.</span>
-            </div>
-          )}
         </div>
       )}
       {candidates.length > 9 && (

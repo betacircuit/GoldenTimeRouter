@@ -6,7 +6,7 @@ import {
   type Ref,
   type ReactNode,
 } from "react";
-import { FileText, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import {
   applyExtraction,
   containsIdentifier,
@@ -166,29 +166,22 @@ export default function NaturalPatient({
 
   return (
     <section className="patient-composer">
-      <div className="patient-composer-heading">
-        <h1>
-          <FileText size={19} /> 환자 정보
-        </h1>
-        <span>{value.text.length.toLocaleString()} / 6,000</span>
-      </div>
       <label className="sr-only" htmlFor="patient-narrative">
         환자 관찰 기록
       </label>
-      <textarea
-        id="patient-narrative"
-        value={value.text}
-        disabled={loading || disabled}
-        rows={3}
-        maxLength={6000}
-        placeholder="환자의 증상, 발생 시각, 관찰한 상태를 입력하세요."
-        onChange={(e) => {
-          onChange({ ...value, text: e.target.value, reviewedAt: null });
-          setError("");
-        }}
-      />
-      <div className="patient-composer-footer">
-        <span>관찰한 내용을 자유롭게 적어 주세요.</span>
+      <div className="patient-composer-body">
+        <textarea
+          id="patient-narrative"
+          value={value.text}
+          disabled={loading || disabled}
+          rows={3}
+          maxLength={6000}
+          placeholder="환자의 증상, 발생 시각, 관찰한 상태를 입력하세요."
+          onChange={(e) => {
+            onChange({ ...value, text: e.target.value, reviewedAt: null });
+            setError("");
+          }}
+        />
         {action}
       </div>
       {error && (
