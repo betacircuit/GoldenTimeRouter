@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { z } from "zod";
-import { FIELD_CATALOG } from "../src/patient/catalog";
+import { FIELD_CATALOG } from "../src/patient/catalog.js";
 import {
   containsIdentifier,
   extractionInputSchema,
   extractionSchema,
   validateExtraction,
-} from "../src/patient/extraction";
+} from "../src/patient/extraction.js";
 
 export const DEFAULT_MODEL = "qwen/qwen3.8-27b:free";
 export function patientExtractionPlugin(

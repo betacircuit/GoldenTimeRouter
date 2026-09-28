@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 import { z } from "zod";
-import { pointSchema, routeSchema } from "../src/domain";
-import { distance } from "../src/services/serverCatalog";
+import { pointSchema, routeSchema } from "../src/domain.js";
+import { distance } from "../src/services/serverCatalog.js";
 
 const destination = pointSchema.extend({ id: z.string().min(1).max(100) });
 export const etaRequest = z

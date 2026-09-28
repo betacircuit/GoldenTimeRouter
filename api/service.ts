@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { patientExtractionPlugin, DEFAULT_MODEL } from "../server/patient";
-import { kakaoRoutingPlugin } from "../server/routing";
+import { patientExtractionPlugin, DEFAULT_MODEL } from "../server/patient.js";
+import { kakaoRoutingPlugin } from "../server/routing.js";
 
 type Middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void | Promise<void>;
 function middleware(plugin: ReturnType<typeof patientExtractionPlugin>): Middleware {

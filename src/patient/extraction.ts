@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FIELD_CATALOG } from "./catalog";
+import { FIELD_CATALOG } from "./catalog.js";
 
 export const fieldNames = FIELD_CATALOG.map((f) => f.field);
 export type FieldName = (typeof FIELD_CATALOG)[number]["field"];

@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { RouterApi } from "./api";
+import type { RouterApi } from "./api.js";
 import {
   candidateSchema,
   routeSchema,
   type Point,
   type Candidate,
-} from "../domain";
+} from "../domain.js";
 
 const hospital = z.object({
   hospital_id: z.string(),
