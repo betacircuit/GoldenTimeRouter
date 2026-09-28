@@ -109,6 +109,12 @@ const selectedMode =
     : import.meta.env.VITE_DATA_MODE;
 export const isServerData = selectedMode === "server";
 export const isDemo = selectedMode !== "live" && !isServerData;
+export const primaryApi: RouterApi =
+  import.meta.env.VITE_DATA_MODE === "server"
+    ? serverCatalogApi
+    : import.meta.env.VITE_DATA_MODE === "live"
+      ? createHttpApi(import.meta.env.VITE_API_BASE_URL || "/api")
+      : mockApi;
 export const api: RouterApi = isServerData
   ? serverCatalogApi
   : isDemo

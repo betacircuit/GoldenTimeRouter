@@ -3,82 +3,73 @@ import { expect, test } from "@playwright/test";
 import { createFixture } from "../src/services/mock";
 import type { RecommendationRequest } from "../src/domain";
 
-test("live HTTP adapter renders model response, enables verified contact and isolates map failure", async ({
-  page,
-  context,
-}) => {
+test.beforeEach(async ({ context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 37.5663, longitude: 126.9779 });
+});
+test("live response and contact remain available without a map or automatic dial", async ({
+  page,
+}) => {
   let submitted: RecommendationRequest | undefined;
-  await page.route("**/api/recommendations", async (route) => {
-    submitted = route.request().postDataJSON();
+  await page.route("**/api/recommendations", (r) => {
+    submitted = r.request().postDataJSON();
     const response = createFixture(submitted!, "three");
     response.isDemo = false;
-    response.model.version = "test-contract";
     response.candidates.forEach((c, i) => {
-      c.name = `연동 검증 병원 ${i + 1}`;
+      c.name = "연동 검증 병원 " + (i + 1);
     });
-    await route.fulfill({ json: response });
+    return r.fulfill({ json: response });
   });
-  await page.route("**/api/hospitals/*", (route) =>
-    route.fulfill({
+  await page.route("**/api/hospitals/*", (r) =>
+    r.fulfill({
       json: {
         id: "demo-1",
         name: "연동 검증 병원 1",
-        address: "연동 테스트 주소",
+        address: "테스트 주소",
         emergencyPhone: "02-0000-0000",
         isDemo: false,
       },
     }),
   );
-  await page.route("**/api/routes", (route) =>
-    route.fulfill({ status: 503, json: {} }),
-  );
   await page.goto("/");
-  await expect(page.getByText("데모 데이터·예측", { exact: true })).toHaveCount(
-    0,
-  );
-  await page.getByRole("button", { name: "새로고침" }).click();
-  await expect(page.getByRole("button", { name: "새로고침" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
   await fillNatural(page, 63);
-  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await page
+    .getByRole("button", { name: /병원 (다시 )?찾기/, exact: true })
+    .click();
   await expect(page.locator(".hospital-card")).toHaveCount(3);
   expect(submitted?.patient.ageYears).toBe(63);
   expect(submitted?.patient.vitals.heartRate).toBeNull();
-  await page.getByRole("tab", { name: "지도", exact: true }).click();
   await expect(page.getByText("지도를 표시할 수 없습니다")).toBeVisible();
-  await expect(
-    page.getByText("경로를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "1위 연동 검증 병원 1 상세 보기" })
-    .click();
-  await expect(page.getByRole("link", { name: "응급실 전화" })).toHaveAttribute(
-    "href",
-    "tel:0200000000",
-  );
-  await expect(
-    page.getByRole("heading", { name: "연동 검증 병원 1", exact: true }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "연동 검증 병원 1 전화" }).click();
+  await expect(page.getByRole("dialog")).toContainText("02-0000-0000");
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toContainText("입력된 필요 자원");
 });
-
-test("live API failure does not manufacture hospital candidates", async ({
+test("live failure preserves input without inventing candidates; Demo works in live mode", async ({
   page,
-  context,
 }) => {
-  await context.grantPermissions(["geolocation"]);
-  await context.setGeolocation({ latitude: 37.5663, longitude: 126.9779 });
-  await page.route("**/api/recommendations", (route) =>
-    route.fulfill({ status: 503, json: {} }),
+  await page.route("**/api/recommendations", (r) =>
+    r.fulfill({ status: 503, json: {} }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "새로고침" }).click();
-  await expect(page.getByRole("button", { name: "새로고침" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
   await fillNatural(page, null);
-  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
+  await page
+    .getByRole("button", { name: /병원 (다시 )?찾기/, exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "정보를 불러오지 못했습니다",
   );
   await expect(page.locator(".hospital-card")).toHaveCount(0);
   await expect(page.getByLabel("환자 관찰 기록")).not.toHaveValue("");
+  await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
+  await page.getByRole("button", { name: "데모 병원 찾기" }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await page.getByRole("button", { name: "데모 중앙병원 전화" }).click();
+  await expect(page.getByRole("dialog")).toContainText("시연용 가상 번호");
 });

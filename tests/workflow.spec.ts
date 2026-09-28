@@ -5,170 +5,257 @@ test.beforeEach(async ({ context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 37.5663, longitude: 126.9779 });
 });
-async function example(page: Page) {
-  await page.getByRole("button", { name: "예시 입력" }).click();
+async function demo(page: Page, scenario = "normal") {
+  await page.goto("/results?data=demo&run=1&scenario=" + scenario);
+  await expect(
+    page.getByRole("button", { name: "데모 시나리오 설정" }),
+  ).toBeEnabled();
 }
-async function search(page: Page) {
-  await page.getByRole("button", { name: "병원 찾기", exact: true }).click();
-  await expect(page).toHaveURL(/results/);
-}
-async function scenario(page: Page, value: string) {
-  await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
-  await page.getByLabel("응답 시나리오").selectOption(value);
-  await page.getByRole("button", { name: "적용", exact: true }).click();
-}
-
-test("tablet input and results fit without page scrolling, with logo and concise controls", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("img", { name: "Golden Time Router 로고" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "데이터 근거" })).toHaveText("");
-  await expect(page.getByText("자동 등록됨")).toHaveCount(0);
-  await expect(page.getByText("DEPARTURE")).toHaveCount(0);
-  for (const viewport of [{width:1024,height:768},{width:768,height:1024},{width:1366,height:768}]) {
+test("unified 3 by 3 workspace fits desktop and tablet and omits removed controls", async ({
+  page,
+}) => {
+  await demo(page);
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.locator(".priority-card")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "주소 검색" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "정보 확인" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "예시 입력" })).toHaveCount(0);
+  await expect(page.locator(".hospital-grid")).not.toContainText("소요시간");
+  await expect(page.locator(".hospital-grid")).not.toContainText("수용확률");
+  for (const viewport of [
+    { width: 1920, height: 1080 },
+    { width: 1366, height: 768 },
+    { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+  ]) {
     await page.setViewportSize(viewport);
-    const input = await page.getByLabel("환자 관찰 기록").boundingBox();
-    const map = await page.locator(".location-panel").boundingBox();
-    expect(map!.x).toBeGreaterThan(input!.x);
-    expect(map!.height).toBeGreaterThan(400);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const cards = await page.locator(".hospital-card").evaluateAll((nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect();
+        return { x: r.x, y: r.y, bottom: r.bottom };
+      }),
+    );
+    expect(cards[1].y).toBe(cards[0].y);
+    expect(cards[2].y).toBe(cards[0].y);
+    expect(cards[3].x).toBe(cards[0].x);
+    expect(cards[8].bottom).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <= innerWidth &&
+          document.documentElement.scrollHeight <= innerHeight,
+      ),
+    ).toBe(true);
+    expect(
+      await page
+        .locator(".hospital-card")
+        .evaluateAll((nodes) =>
+          nodes.every((n) => n.scrollHeight <= n.clientHeight + 2),
+        ),
+    ).toBe(true);
   }
-  await page.screenshot({path:"test-results/tablet-input.png"});
-  await example(page); await search(page);
-  await expect(page.getByText("조건에 맞는 병원 10곳")).toHaveCount(0);
-  for (const viewport of [{width:1024,height:768},{width:768,height:1024},{width:1366,height:768}]) {
-    await page.setViewportSize(viewport);
-    const last = await page.locator(".hospital-card").last().boundingBox();
-    expect(last!.y+last!.height).toBeLessThanOrEqual(viewport.height);
-    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  }
-  await expect(page.getByRole("region", {name:"병원 위치 비교"})).toBeVisible();
-  const sideMap = await page.locator(".map-results .map-frame").boundingBox();
-  expect(sideMap!.height).toBeGreaterThan(200);
-  await page.screenshot({path:"test-results/tablet-results.png"});
-});
-
-test("direct search, all ten candidates, sort and page selection survive detail", async ({ page }) => {
-  await page.goto("/"); await example(page); await search(page);
-  await expect(page.locator(".hospital-card")).toHaveCount(4);
-  await page.getByRole("button", {name:"병원 목록 다음"}).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(4);
-  await page.getByRole("button", {name:"8위 데모 서강병원 상세 보기"}).click();
-  await expect(page.getByRole("heading", {name:"데모 서강병원",exact:true})).toBeVisible();
-  await expect(page.getByRole("button", {name:"응급실 전화"})).toBeDisabled();
-  await page.getByRole("button", {name:"병원 목록으로"}).click();
-  await expect(page.locator(".selected-card")).toHaveAccessibleName("8위 데모 서강병원 상세 보기");
-  await page.getByRole("button", {name:"병원 목록 다음"}).click();
-  await expect(page.locator(".hospital-card")).toHaveCount(2);
-  await page.getByLabel("병원 정렬").selectOption("eta");
-  await expect(page.locator(".hospital-card").first()).toHaveAccessibleName("2위 데모 한빛병원 상세 보기");
-});
-
-test("map marker selection and detail refer to the same hospital", async ({ page }) => {
-  await page.goto("/"); await example(page); await search(page);
-  await page.getByRole("tab", {name:"지도",exact:true}).click();
-  await page.getByRole("button", {name:"3위 데모 북서울병원 선택",exact:true}).click();
-  await page.getByRole("button", {name:"3위 데모 북서울병원 상세 보기",exact:true}).click();
-  await expect(page.getByRole("heading", {name:"데모 북서울병원",exact:true})).toBeVisible();
-  await page.getByRole("button", {name:"병원 목록으로"}).click();
-  await expect(page.getByRole("button", {name:"3위 데모 북서울병원 선택",exact:true})).toHaveAttribute("aria-pressed","true");
-});
-
-test("optional numeric review keeps the wheel and records corrections", async ({ page }) => {
-  await page.goto("/"); await example(page);
-  await page.getByRole("button", {name:"정보 확인",exact:true}).click();
-  await page.getByRole("button", {name:"연령 수정: 58",exact:true}).click();
-  const tens=page.getByRole("spinbutton", {name:"10의 자리",exact:true});
-  await expect.poll(()=>tens.evaluate(e=>e.scrollTop)).toBe(5*48);
-  await tens.press("ArrowUp");
-  await page.getByRole("spinbutton", {name:"1의 자리",exact:true}).press("ArrowUp");
-  await page.getByRole("button", {name:"선택 적용",exact:true}).click();
-  await page.getByRole("button", {name:"수정 저장",exact:true}).click();
-  await expect(page.getByRole("button", {name:"연령 수정: 47",exact:true})).toBeVisible();
-  await page.getByRole("button", {name:"완료",exact:true}).click();
-  await search(page);
-  await page.getByRole("button", {name:"정보 수정",exact:true}).click();
-  await page.getByRole("button", {name:"정보 확인",exact:true}).click();
-  await expect(page.getByRole("button", {name:"연령 수정: 47",exact:true})).toBeVisible();
-  await expect(page.locator('input[type="number"]')).toHaveCount(0);
-});
-
-test("a single click extracts narrative then searches, showing elapsed progress", async ({ page }) => {
-  let calls=0;
-  await page.route("**/patient-api/extract", async r=>{
-    calls++;
-    await new Promise(resolve=>setTimeout(resolve,1300));
-    await r.fulfill({json:{...exampleExtraction(), model:"test", inputVersion:r.request().postDataJSON().inputVersion}});
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.screenshot({
+    path: "test-results/finder-desktop.png",
+    fullPage: true,
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/finder-mobile.png",
+    fullPage: true,
+  });
+});
+test("phone shows a concise contact card, pagination and map selection survive navigation", async ({
+  page,
+}) => {
+  await demo(page);
+  await page.getByRole("button", { name: "병원 목록 다음" }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(1);
+  await page.getByRole("button", { name: "데모 푸른병원 전화" }).click();
+  await expect(page).toHaveURL(/hospitals\/demo-10/);
+  await expect(page.getByRole("dialog")).toContainText("02-0000-0010");
+  await expect(page.getByRole("dialog")).toContainText("심장 진료");
+  await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".hospital-card")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "3위 데모 북서울병원 지도에서 선택" })
+    .click();
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(
+    page.getByRole("button", { name: "3위 데모 북서울병원 선택", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "데모 북서울병원 전화" }).click();
+  await page.goBack();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+test("Demo applies selected patient, origin, custom values and restores them on reload", async ({
+  page,
+}) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
+  await page.getByRole("button", { name: "소아 고열", exact: true }).click();
+  await page.getByLabel("출발 위치", { exact: true }).selectOption("2");
+  await page.getByText("병원별 시간·확률 설정", { exact: true }).click();
+  await page.getByLabel("후보 1 이동 시간", { exact: true }).fill("9");
+  await page.getByLabel("후보 1 수용 확률", { exact: true }).fill("96");
+  await page.getByRole("button", { name: "데모 병원 찾기" }).click();
+  await expect(page.locator(".hospital-card").first()).toContainText("09분");
+  await expect(page.locator(".hospital-card").first()).toContainText("96%");
+  await expect(page.getByLabel("환자 관찰 기록")).toContainText("6세");
+  await expect(page).toHaveURL(/case=child/);
+  await page.reload();
+  await expect(page.locator(".hospital-card").first()).toContainText("96%");
+  await page.getByRole("button", { name: "데모 중앙병원 전화" }).click();
+  await expect(page.getByRole("dialog")).toContainText("소아 진료");
+});
+test("editing patient text invalidates both cards and map, and search uses new extraction", async ({
+  page,
+}) => {
+  let calls = 0;
+  await page.route("**/patient-api/extract", (r) => {
+    calls++;
+    return r.fulfill({
+      json: {
+        ...exampleExtraction(),
+        model: "test",
+        inputVersion: r.request().postDataJSON().inputVersion,
+      },
+    });
+  });
+  await demo(page);
   await page.getByLabel("환자 관찰 기록").fill(EXAMPLE_TEXT);
-  await page.getByRole("button", {name:"병원 찾기",exact:true}).click();
-  await expect(page.getByRole("timer")).toBeVisible();
-  await expect(page.getByRole("button", {name:"처리 중",exact:true})).toBeDisabled();
-  await expect(page).toHaveURL(/results/);
+  await expect(page.locator(".hospital-card")).toHaveCount(0);
+  await expect(page.locator(".schematic-marker")).toHaveCount(0);
+  await page.getByRole("button", { name: "병원 다시 찾기" }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
   expect(calls).toBe(1);
 });
-
-test("cancelling extraction prevents late navigation and preserves input", async ({ page }) => {
-  await page.route("**/patient-api/extract", async r=>{
-    await new Promise(resolve=>setTimeout(resolve,1500));
-    await r.fulfill({json:{...exampleExtraction(),model:"test",inputVersion:r.request().postDataJSON().inputVersion}}).catch(()=>{});
+for (const [scenario, count] of [
+  ["three", 3],
+  ["empty", 0],
+] as const)
+  test(scenario + " response has no invented candidates", async ({ page }) => {
+    await demo(page, scenario);
+    await expect(page.locator(".hospital-card")).toHaveCount(count);
+    if (!count)
+      await expect(
+        page.getByRole("heading", { name: "조건에 맞는 병원이 없습니다" }),
+      ).toBeVisible();
   });
-  await page.goto("/"); await page.getByLabel("환자 관찰 기록").fill(EXAMPLE_TEXT);
-  await page.getByRole("button", {name:"병원 찾기",exact:true}).click();
-  await page.getByRole("button", {name:"검색 취소",exact:true}).click();
-  await expect(page.getByRole("timer")).toHaveCount(0);
-  await expect(page.getByLabel("환자 관찰 기록")).toHaveValue(EXAMPLE_TEXT);
-  await expect(page.getByRole("button", {name:"병원 찾기",exact:true})).toBeEnabled();
+test("mixed response preserves missing values and resource warnings", async ({
+  page,
+}) => {
+  await demo(page, "mixed");
+  await expect(page.locator(".hospital-card").nth(1)).toContainText(
+    "정보 없음",
+  );
+  await expect(page.locator(".hospital-card").nth(2)).toContainText(
+    "조회 불가",
+  );
+  await expect(page.locator(".hospital-card").nth(3)).toContainText(
+    "오래된 정보",
+  );
+  await expect(page.locator(".hospital-card").nth(4)).toContainText(
+    "필요 자원 미충족",
+  );
 });
-
-test("extraction quota errors preserve changed text and do not reuse old facts", async ({ page }) => {
-  await page.route("**/patient-api/extract",r=>r.fulfill({status:429,json:{error:"호출 한도"}}));
-  await page.goto("/"); await example(page);
-  await page.getByLabel("환자 관찰 기록").fill("60대 환자, 흉통 호소");
-  await page.getByRole("button", {name:"병원 찾기",exact:true}).click();
-  await expect(page.getByRole("alert")).toContainText("호출 한도");
-  await expect(page.getByLabel("환자 관찰 기록")).toHaveValue("60대 환자, 흉통 호소");
-  await expect(page.locator(".hospital-card")).toHaveCount(0);
+test("error scenario retains input and recovers through Demo", async ({
+  page,
+}) => {
+  await demo(page, "error");
+  await expect(page.getByRole("alert")).toContainText(
+    "추천 정보를 불러오지 못했습니다",
+  );
+  await expect(page.getByLabel("환자 관찰 기록")).not.toHaveValue("");
+  await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
+  await page.getByLabel("응답 시나리오").selectOption("normal");
+  await page.getByRole("button", { name: "데모 병원 찾기" }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
 });
-
-for (const [mode,count] of [["three",3],["empty",0]] as const) test(`${count} candidates render without invented results`, async ({page})=>{
-  await page.goto("/"); await scenario(page,mode); await example(page); await search(page);
-  await expect(page.locator(".hospital-card")).toHaveCount(count);
-  if(!count) await expect(page.getByRole("heading",{name:"조건에 맞는 병원이 없습니다"})).toBeVisible();
+test("map zooms into a nearby cluster and expands to contain distant top three", async ({
+  page,
+}) => {
+  await demo(page, "normal");
+  const normal = Number(
+    await page.locator(".schematic").getAttribute("data-map-span-km"),
+  );
+  await demo(page, "clustered");
+  const clustered = Number(
+    await page.locator(".schematic").getAttribute("data-map-span-km"),
+  );
+  expect(clustered).toBeLessThan(normal / 2);
+  await demo(page, "wide");
+  const wide = Number(
+    await page.locator(".schematic").getAttribute("data-map-span-km"),
+  );
+  expect(wide).toBeGreaterThan(normal);
+  const frame = (await page.locator(".map-frame").boundingBox())!;
+  for (const marker of await page.locator(".top-marker").all()) {
+    const box = (await marker.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(frame.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(frame.x + frame.width);
+    expect(box.y).toBeGreaterThanOrEqual(frame.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height);
+  }
 });
-
-test("missing probability, route failure, stale and unmet resources remain explicit", async ({page})=>{
-  await page.goto("/"); await scenario(page,"mixed"); await example(page); await search(page);
-  await expect(page.getByRole("button",{name:"2위 데모 한빛병원 상세 보기"})).toContainText("정보 없음");
-  await expect(page.getByRole("button",{name:"3위 데모 북서울병원 상세 보기"})).toContainText("조회 불가");
-  await expect(page.getByRole("button",{name:"4위 데모 서림병원 상세 보기"})).toContainText("오래된 정보");
-  await page.getByRole("button",{name:"3위 데모 북서울병원 상세 보기"}).click();
-  await expect(page.getByText("경로 조회 불가 · 병원 정보는 계속 확인할 수 있습니다.")).toBeVisible();
-  await page.getByRole("button",{name:"병원 목록으로"}).click();
-  await page.getByRole("button",{name:"병원 목록 다음"}).click();
-  await expect(page.getByRole("button",{name:"5위 데모 새봄병원 상세 보기"})).toContainText("미충족");
-});
-
-test("recommendation errors keep input and can recover", async ({page})=>{
-  await page.goto("/"); await scenario(page,"error"); await example(page);
-  await page.getByRole("button",{name:"병원 찾기",exact:true}).click();
-  await expect(page.getByRole("alert")).toContainText("추천 정보를 불러오지 못했습니다");
-  await expect(page.getByLabel("환자 관찰 기록")).toHaveValue(EXAMPLE_TEXT);
-  await scenario(page,"normal"); await search(page);
-});
-
-test("manual address works when location is pending", async ({page})=>{
-  await page.addInitScript(()=>Object.defineProperty(navigator,"geolocation",{value:{getCurrentPosition(){}}}));
+test("cancelled extraction cannot display late results", async ({ page }) => {
+  await page.route("**/patient-api/extract", async (r) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await r
+      .fulfill({
+        json: {
+          ...exampleExtraction(),
+          model: "test",
+          inputVersion: r.request().postDataJSON().inputVersion,
+        },
+      })
+      .catch(() => {});
+  });
   await page.goto("/");
-  await page.getByRole("button",{name:"주소 검색",exact:true}).click();
-  await page.getByLabel("도로명 주소 검색").fill("서울역");
-  await page.getByRole("button",{name:"검색",exact:true}).click();
-  await page.getByRole("button",{name:"서울역 · 서울 용산구 한강대로 405"}).click();
-  await expect(page.getByRole("button",{name:"병원 찾기",exact:true})).toBeEnabled();
-  await example(page); await search(page);
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await page.getByLabel("환자 관찰 기록").fill(EXAMPLE_TEXT);
+  await page
+    .getByRole("button", { name: /병원 (다시 )?찾기/, exact: true })
+    .click();
+  await page.getByRole("button", { name: "검색 취소" }).click();
+  await expect(page.locator(".finder-processing")).toHaveCount(0);
+  await expect(page.getByLabel("환자 관찰 기록")).toHaveValue(EXAMPLE_TEXT);
+  await expect(page.locator(".hospital-card")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /병원 (다시 )?찾기/, exact: true }),
+  ).toBeEnabled();
 });
-
-test("invalid detail URL returns to entry",async({page})=>{
-  await page.goto("/hospitals/missing");
-  await expect(page.getByRole("heading",{name:"환자 정보",exact:true})).toBeVisible();
+test("location denial offers current-location retry and Demo still works", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition(
+          _success: unknown,
+          failure: (e: { code: number }) => void,
+        ) {
+          failure({ code: 1 });
+        },
+      },
+    }),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("alert")).toContainText("위치 권한");
+  await expect(
+    page.getByRole("button", { name: "현재 위치", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "데모 시나리오 설정" }).click();
+  await page.getByRole("button", { name: "데모 병원 찾기" }).click();
+  await expect(page.locator(".hospital-card")).toHaveCount(9);
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });

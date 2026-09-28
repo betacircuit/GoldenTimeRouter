@@ -5,6 +5,7 @@ import App from "./App";
 import "./theme.css";
 import "./patient.css";
 import "./workspace.css";
+import "./finder.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
